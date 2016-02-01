@@ -28,7 +28,7 @@
 #include <object_recognition.h>
 #include <image_transport/image_transport.h>
 #include <cv_bridge/cv_bridge.h>
-// #include <sensor_msgs/image_encodings.h>
+#include <sensor_msgs/image_encodings.h>
 // #include <vector>
 // #include <cvaux.h>
 // #include <cxcore.hpp>
@@ -45,7 +45,8 @@ ObjectRecognition::ObjectRecognition(int argc, char** argv) {
     ros::NodeHandle n;
     flagShowScreen = 1;
     // face_recognition_feedback = n.subscribe("/face_recognition/feedback", 10, &QNode::feedbackCB, this);
-    image_receiver = n.subscribe("/camera/depth/image_raw", 1, &ObjectRecognition::depthImageCB, this);
+    rgb_image_receiver = n.subscribe("/camera/rgb/image_raw", 1, &ObjectRecognition::rgbImageCB, this);
+    depth_image_receiver = n.subscribe("/camera/depth/image_raw", 1, &ObjectRecognition::depthImageCB, this);
 }
 
 ObjectRecognition::~ObjectRecognition(void)
@@ -55,13 +56,38 @@ ObjectRecognition::~ObjectRecognition(void)
     }
 }
 
+void ObjectRecognition::rgbImageCB(const sensor_msgs::ImageConstPtr& pRGBInput)
+{
+    // Convert ROS images to OpenCV
+    cv::Mat rgbImage;
+    try
+    {
+        rgbImage = cv_bridge::toCvShare(pRGBInput, "bgr8") -> image;
+    }
+    catch (cv_bridge::Exception& e)
+    {
+        ROS_ERROR("Could not convert from ROS images to OpenCV type: %s", e.what());
+    }
+    if(flagShowScreen) {
+        showRGBImage(rgbImage);
+    }
+}
+
+void ObjectRecognition::showRGBImage(cv::Mat rgbImage) {
+    cv::Mat adjRGBImage;
+    rgbImage.convertTo(adjRGBImage, CV_8UC1);
+    cv::imshow("RGB image", adjRGBImage);
+    cvWaitKey(1);
+}
+
+
 void ObjectRecognition::depthImageCB(const sensor_msgs::ImageConstPtr& pDepthInput)
 {
     // Convert ROS images to OpenCV
-    cv::Mat depth_image;
+    cv::Mat depthImage;
     try
     {
-        depth_image = cv_bridge::toCvShare(pDepthInput, "32FC1") -> image;
+        depthImage = cv_bridge::toCvShare(pDepthInput, "32FC1") -> image;
     }
     catch (cv_bridge::Exception& e)
     {
@@ -69,7 +95,7 @@ void ObjectRecognition::depthImageCB(const sensor_msgs::ImageConstPtr& pDepthInp
     }
     if(flagShowScreen) {
         double maxRange = 8000;
-        showDepthImage(depth_image, maxRange);
+        showDepthImage(depthImage, maxRange);
     }
 }
 
@@ -80,73 +106,13 @@ void ObjectRecognition::showDepthImage(cv::Mat depth_image, double maxRange) {
     cvWaitKey(1);
 }
 
-
-//     void executeCB(const face_recognition::FaceRecognitionGoalConstPtr &goal)
-//     {
-//     //check to be sure if the goal should be still persuaded
-//         if( as_.isPreemptRequested() || ros::isShuttingDown() )
-//         {
-//             as_.setPreempted(); 
-//             return;
-//         }
-//         //check if the name of the person has been provided for the add-face-images goal  
-//         if(goal->order_id == 2 && goal->order_argument.empty() ) 
-//         {
-//             ROS_INFO("No name has been provided for the add_person_images goal");
-//             as_.setPreempted();
-//             return;
-//         }
-//         ros::Rate r(4);
-//         //Storing the information about the current goal and reseting feedback and result variables  
-//         goal_argument_ = goal->order_argument;
-//         result_.order_id = goal->order_id;  
-//         feedback_.order_id = goal->order_id;
-//         result_.names.clear();
-//         result_.confidence.clear();
-//         feedback_.names.clear();
-//         feedback_.confidence.clear();
-//         goal_id_ = goal->order_id;
-//         switch(goal_id_)
-//         { 
-//           //(exit) Goal is to exit
-//             case 4: ROS_INFO("exit request");
-//                 as_.setSucceeded(result_);
-//                 r.sleep();
-//                 ros::shutdown(); 
-//                 break;
-//             case 3:
-//               //(train_database) Goal is to (re)train the database from training images
-//                 if(frl.retrainOnline()) 
-//                     as_.setSucceeded(result_);
-//                 else 
-//                     as_.setAborted(result_);
-//                 break;
-//               //(recognize_once) Goal is to recognize the person in the video stream, succeed when the first person is found
-//             case 0:
-//               //(recognize_continuous) Goal is to Continuously recognize persons in the video stream and provide feedback continuously. This goal is persuaded for infinite time
-//             case 1:
-//               //(add_face_images) Goal is to take a number of(add_face_number) images of a person's face from the video stream and save them as training images 
-//             case 2: 
-//       	    {
-//             	if(goal_id_ == 2)
-//                 add_face_count=0;
-//                   //to synchronize with processes performed in the subscribed function to the video stream (imageCB)
-//                   //as far as the goal id is 0, 1 or 2, it's active and there is no preempting request, imageCB function can be called.
-//                 while( as_.isActive() && !as_.isPreemptRequested() && !ros::isShuttingDown() )
-//                 r.sleep();
-//         	    mutex_.lock();
-//                 if(as_.isActive())	
-//                 { 
-//                     as_.setPreempted();
-//                     ROS_INFO("Goal %d is preempted",goal_id_);
-//                 } 
-//                 goal_id_ = -99;
-//                 mutex_.unlock();       
-//          	    break;	       
-//       	    }   
-//         }
-//         goal_id_ = -99; 
-//     }
+    // for(int i = 0; i < adjDepthImage.rows; i++) { 
+    //     for(int j = 0; j < adjDepthImage.cols; j++){
+    //         if(adjDepthImage.at<int>(i,j) > testOut){
+    //             testOut = adjDepthImage.at<int>(i,j);
+    //         }
+    //     }   
+    // }
 
 //     int calcNumTrainingPerson(const char * filename)
 //     {
@@ -379,30 +345,6 @@ void ObjectRecognition::showDepthImage(cv::Mat depth_image, double maxRange) {
 //         mutex_.unlock();
 //         return;		
 //     }
-
-
-// protected:
-    
-//     boost::mutex mutex_; //for synchronization between executeCB and imageCB
-//     std::string goal_argument_; 
-//     int goal_id_;
-//     face_recognition::FaceRecognitionFeedback feedback_; 
-//     face_recognition::FaceRecognitionResult result_;
-//     int add_face_count; //help variable to count the number of training images already taken in the add_face_images goal
-//     FILE *trainFile; 
-//     double confidence_value;//a face recognized with confidence value higher than confidence_value threshold is accepted as valid.
-//     bool   show_screen_flag;//if output window is shown
-//     int    add_face_number; //the number of training images to be taken in add_face_images goal
-//     CvFont font;
-//     CvScalar textColor;
-//     ostringstream text_image;
-//     ros::NodeHandle nh_, pnh_;
-//     FaceRecognitionLib frl; 
-//     image_transport::ImageTransport it_;
-//     image_transport::Subscriber image_sub_;
-//     image_transport::Publisher image_pub;
-//     actionlib::SimpleActionServer<face_recognition::FaceRecognitionAction> as_;
-//     int person_number;     //the number of persons in the train file (train.txt)
 
 
 int main(int argc, char** argv)

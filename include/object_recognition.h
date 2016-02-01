@@ -20,8 +20,13 @@ private:
 	ros::Publisher chatter_publisher;
 	ros::Publisher face_recognition_command;
 	ros::Subscriber face_recognition_feedback;
-	ros::Subscriber image_receiver;
+	ros::Subscriber rgb_image_receiver;
+	ros::Subscriber depth_image_receiver;
+
+    void rgbImageCB(const sensor_msgs::ImageConstPtr& msg);
+    void showRGBImage(cv::Mat depth_image);
     void depthImageCB(const sensor_msgs::ImageConstPtr& msg);
     void showDepthImage(cv::Mat depth_image, double maxRange);
+
 };
 
