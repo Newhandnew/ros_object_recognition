@@ -13,20 +13,25 @@ class ObjectRecognition {
 public:
 	ObjectRecognition(int argc, char** argv);
 	~ObjectRecognition(void);
-	int testOut;
+	bool flagShowScreen;
+    void showRGBImage();
+    void showDepthImage();
+	void showCombineImages();
 
 private:
-	bool flagShowScreen;
 	ros::Publisher chatter_publisher;
 	ros::Publisher face_recognition_command;
 	ros::Subscriber face_recognition_feedback;
 	ros::Subscriber rgb_image_receiver;
 	ros::Subscriber depth_image_receiver;
 
+	cv::Mat rgbImage;
+	cv::Mat depthImage;
+	cv::Mat imageCombine;
+
     void rgbImageCB(const sensor_msgs::ImageConstPtr& msg);
-    void showRGBImage(cv::Mat depth_image);
     void depthImageCB(const sensor_msgs::ImageConstPtr& msg);
-    void showDepthImage(cv::Mat depth_image, double maxRange);
+
 
 };
 

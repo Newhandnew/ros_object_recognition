@@ -1,29 +1,3 @@
-/* Copyright 2012 Pouyan Ziafati, University of Luxembourg and Utrecht University
-
-* A ROS simple actionlib server for face recognition in video stream. It provides different face recognition functionalities such as adding training images directly from the video stream, re-training (updating the database to include new training images), recognizing faces in the video stream, etc.
-
-* All image processing and face recognition functionalities are provided by utilizing the Shervin Emami's c++ source code for face recognition (http://www.shervinemami.info/faceRecognition.html). Face Recognition is performed using Eigenfaces (also called "Principal Component Analysis" or PCA) 
-
-*License: Attribution-NonCommercial 3.0 Unported (http://creativecommons.org/licenses/by-nc/3.0/)
-*You are free:
-    *to Share — to copy, distribute and transmit the work
-    *to Remix — to adapt the work
-
-*Under the following conditions:
-    *Attribution — You must attribute the work in the manner specified by the author or licensor (but not in any way that suggests that they endorse you or your use of the work).
-    *Noncommercial — You may not use this work for commercial purposes.
-
-*With the understanding that:
-    *Waiver — Any of the above conditions can be waived if you get permission from the copyright holder.
-    *Public Domain — Where the work or any of its elements is in the public domain under applicable law, that status is in no way affected by the license.
-    *Other Rights — In no way are any of the following rights affected by the license:
-        *Your fair dealing or fair use rights, or other applicable copyright exceptions and limitations;
-        *The author's moral rights;
-        *Rights other persons may have either in the work itself or in how the work is used, such as publicity or privacy rights.
-    *Notice — For any reuse or distribution, you must make clear to others the license terms of this work.
-
-*/
-
 #include <ros/ros.h>
 #include <object_recognition.h>
 #include <image_transport/image_transport.h>
@@ -43,23 +17,25 @@ using namespace std;
 ObjectRecognition::ObjectRecognition(int argc, char** argv) {
     ros::init(argc, argv, "object_recognition");
     ros::NodeHandle n;
-    flagShowScreen = 1;
     // face_recognition_feedback = n.subscribe("/face_recognition/feedback", 10, &QNode::feedbackCB, this);
     rgb_image_receiver = n.subscribe("/camera/rgb/image_raw", 1, &ObjectRecognition::rgbImageCB, this);
     depth_image_receiver = n.subscribe("/camera/depth/image_raw", 1, &ObjectRecognition::depthImageCB, this);
+ 
+    if (flagShowScreen) {
+        cvNamedWindow( "Show images", CV_WINDOW_AUTOSIZE );
+    }
 }
 
 ObjectRecognition::~ObjectRecognition(void)
 {
     if (flagShowScreen) {
-        cvDestroyWindow("Input");
+        cvDestroyWindow("Show images");
     }
 }
 
 void ObjectRecognition::rgbImageCB(const sensor_msgs::ImageConstPtr& pRGBInput)
 {
     // Convert ROS images to OpenCV
-    cv::Mat rgbImage;
     try
     {
         rgbImage = cv_bridge::toCvShare(pRGBInput, "bgr8") -> image;
@@ -68,23 +44,19 @@ void ObjectRecognition::rgbImageCB(const sensor_msgs::ImageConstPtr& pRGBInput)
     {
         ROS_ERROR("Could not convert from ROS images to OpenCV type: %s", e.what());
     }
-    if(flagShowScreen) {
-        showRGBImage(rgbImage);
-    }
 }
 
-void ObjectRecognition::showRGBImage(cv::Mat rgbImage) {
-    cv::Mat adjRGBImage;
-    rgbImage.convertTo(adjRGBImage, CV_8UC1);
-    cv::imshow("RGB image", adjRGBImage);
-    cvWaitKey(1);
+void ObjectRecognition::showRGBImage() {
+    if(rgbImage.cols > 0) {
+        cv::imshow("RGB image", rgbImage);
+        cvWaitKey(1);
+    }
 }
 
 
 void ObjectRecognition::depthImageCB(const sensor_msgs::ImageConstPtr& pDepthInput)
 {
     // Convert ROS images to OpenCV
-    cv::Mat depthImage;
     try
     {
         depthImage = cv_bridge::toCvShare(pDepthInput, "32FC1") -> image;
@@ -93,17 +65,40 @@ void ObjectRecognition::depthImageCB(const sensor_msgs::ImageConstPtr& pDepthInp
     {
         ROS_ERROR("Could not convert from ROS images to OpenCV type: %s", e.what());
     }
-    if(flagShowScreen) {
-        double maxRange = 8000;
-        showDepthImage(depthImage, maxRange);
+}
+
+void ObjectRecognition::showDepthImage() {
+    if(depthImage.cols > 0) {
+        cv::Mat adjDepthImage;
+        double maxRange = 8000;     // set max range to scale down image value
+        depthImage.convertTo(adjDepthImage, CV_8UC1, 255 / (maxRange), 0);
+        cv::imshow("Depth image", adjDepthImage);
+        cvWaitKey(1);
     }
 }
 
-void ObjectRecognition::showDepthImage(cv::Mat depth_image, double maxRange) {
-    cv::Mat adjDepthImage;
-    depth_image.convertTo(adjDepthImage, CV_8UC1, 255 / (maxRange), 0);
-    cv::imshow("Depth image", adjDepthImage);
-    cvWaitKey(1);
+void ObjectRecognition::showCombineImages() {
+    int dstWidth = rgbImage.cols * 2;
+    int dstHeight = rgbImage.rows;
+    if(dstWidth > 0) {
+        // RGB image processing
+        cv::Mat dst = cv::Mat(dstHeight, dstWidth, CV_8UC3, cv::Scalar(0,0,0));
+        cv::Rect roi(cv::Rect(0, 0, rgbImage.cols, rgbImage.rows));
+        cv::Mat targetROI = dst(roi);
+        rgbImage.copyTo(targetROI);
+        // depth image processing
+        cv::Mat adjDepthImage, rgbDepthImage;
+        double maxRange = 8000;     // set max range to scale down image value
+        depthImage.convertTo(adjDepthImage, CV_8UC3, 255 / (maxRange), 0);
+        // change gray image to rgb image
+        cv::cvtColor(adjDepthImage, rgbDepthImage, CV_GRAY2RGB);
+        targetROI = dst(cv::Rect(rgbImage.cols, 0, depthImage.cols, depthImage.rows));
+        rgbDepthImage.copyTo(targetROI);
+        // resize
+        cv::resize(dst, dst, cv::Size(), 0.8, 0.8, cv::INTER_LINEAR);
+        cv::imshow("Show images", dst);
+        cvWaitKey(1);
+    }
 }
 
     // for(int i = 0; i < adjDepthImage.rows; i++) { 
@@ -332,28 +327,20 @@ void ObjectRecognition::showDepthImage(cv::Mat depth_image, double maxRange) {
 //                 }                        
 //             }
 //         }
-//         if (show_screen_flag)
-//         {
-//            cvShowImage("Input", img);
-//            cvWaitKey(1);
-//         } 
-//         // transfer image to topic
-//         sensor_msgs::ImagePtr msgImage = cv_bridge::CvImage(std_msgs::Header(), "bgr8", img).toImageMsg();
-//         image_pub.publish(msgImage);
-//         cvReleaseImage(&equalizedImg);   cvReleaseImage(&img);
-//         r.sleep();
-//         mutex_.unlock();
-//         return;		
 //     }
 
 
 int main(int argc, char** argv)
 {
     ObjectRecognition object_recognition(argc, argv);
+    object_recognition.flagShowScreen = 1;
     ros::Rate r(10); // 10 hz
     while(ros::ok()) {
         // printf("max:%d\n", object_recognition.testOut);
         ros::spinOnce();
+        if(object_recognition.flagShowScreen) {
+            object_recognition.showCombineImages();
+        }
         r.sleep();
     }
     return 0;
