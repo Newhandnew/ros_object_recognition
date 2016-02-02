@@ -13,7 +13,6 @@
 
 using namespace std;
 
-
 ObjectRecognition::ObjectRecognition(int argc, char** argv) {
     ros::init(argc, argv, "object_recognition");
     ros::NodeHandle n;
@@ -26,15 +25,13 @@ ObjectRecognition::ObjectRecognition(int argc, char** argv) {
     }
 }
 
-ObjectRecognition::~ObjectRecognition(void)
-{
+ObjectRecognition::~ObjectRecognition(void) {
     if (flagShowScreen) {
         cvDestroyWindow("Show images");
     }
 }
 
-void ObjectRecognition::rgbImageCB(const sensor_msgs::ImageConstPtr& pRGBInput)
-{
+void ObjectRecognition::rgbImageCB(const sensor_msgs::ImageConstPtr& pRGBInput) {
     // Convert ROS images to OpenCV
     try
     {
@@ -46,16 +43,15 @@ void ObjectRecognition::rgbImageCB(const sensor_msgs::ImageConstPtr& pRGBInput)
     }
 }
 
-void ObjectRecognition::showRGBImage() {
-    if(rgbImage.cols > 0) {
-        cv::imshow("RGB image", rgbImage);
+void ObjectRecognition::showImage(cv::Mat image) {
+    if(image.cols > 0) {
+        cv::imshow("Image", image);
         cvWaitKey(1);
     }
 }
 
 
-void ObjectRecognition::depthImageCB(const sensor_msgs::ImageConstPtr& pDepthInput)
-{
+void ObjectRecognition::depthImageCB(const sensor_msgs::ImageConstPtr& pDepthInput) {
     // Convert ROS images to OpenCV
     try
     {
@@ -79,7 +75,7 @@ void ObjectRecognition::showDepthImage() {
 
 void ObjectRecognition::showCombineImages() {
     int dstWidth = rgbImage.cols * 2;
-    int dstHeight = rgbImage.rows;
+    int dstHeight = rgbImage.rows * 2;
     if(dstWidth > 0) {
         // RGB image processing
         cv::Mat dst = cv::Mat(dstHeight, dstWidth, CV_8UC3, cv::Scalar(0,0,0));
@@ -89,25 +85,80 @@ void ObjectRecognition::showCombineImages() {
         // depth image processing
         cv::Mat adjDepthImage, rgbDepthImage;
         double maxRange = 8000;     // set max range to scale down image value
-        depthImage.convertTo(adjDepthImage, CV_8UC3, 255 / (maxRange), 0);
+        depthImage.convertTo(adjDepthImage, CV_8UC1, 255 / (maxRange), 0);
         // change gray image to rgb image
         cv::cvtColor(adjDepthImage, rgbDepthImage, CV_GRAY2RGB);
         targetROI = dst(cv::Rect(rgbImage.cols, 0, depthImage.cols, depthImage.rows));
         rgbDepthImage.copyTo(targetROI);
+        // limit range and dilation image processing
+        limitRangeDepthImage(200, 1000);
+        dilation();
+        // change gray image to rgb image and show
+        cv::cvtColor(dilationImage, rgbDepthImage, CV_GRAY2RGB);
+        targetROI = dst(cv::Rect(0, depthImage.rows, depthImage.cols, depthImage.rows));
+        rgbDepthImage.copyTo(targetROI);
+        // image fusion get object contour
+        getObjectContour();
+        targetROI = dst(cv::Rect(depthImage.cols, depthImage.rows, depthImage.cols, depthImage.rows));
+        objectImage.copyTo(targetROI);
         // resize
-        cv::resize(dst, dst, cv::Size(), 0.8, 0.8, cv::INTER_LINEAR);
+        cv::resize(dst, dst, cv::Size(), 0.7, 0.7, cv::INTER_LINEAR);
         cv::imshow("Show images", dst);
         cvWaitKey(1);
     }
 }
 
-    // for(int i = 0; i < adjDepthImage.rows; i++) { 
-    //     for(int j = 0; j < adjDepthImage.cols; j++){
-    //         if(adjDepthImage.at<int>(i,j) > testOut){
-    //             testOut = adjDepthImage.at<int>(i,j);
-    //         }
-    //     }   
-    // }
+void ObjectRecognition::limitRangeDepthImage(float minRange, float maxRange) {
+    if(depthImage.cols > 0) {
+        depthInRangeImage = cv::Mat(depthImage.rows, depthImage.cols, CV_8UC1, cv::Scalar::all(0));
+        for(int i = 0; i < depthImage.rows; i++) { 
+            for(int j = 0; j < depthImage.cols; j++) {
+                if(depthImage.at<float>(i,j) > minRange && depthImage.at<float>(i,j) < maxRange) {
+                    depthInRangeImage.at<char>(i,j) = 255;
+                }
+            }   
+        }
+    }
+}
+
+void ObjectRecognition::dilation() {
+    if(depthInRangeImage.cols > 0) {
+        char dilation_size = 10;
+        cv::Mat element = getStructuringElement( cv::MORPH_RECT, cv::Size(2 * dilation_size + 1, 2 * dilation_size + 1), cv::Point(dilation_size, dilation_size));
+        cv::dilate( depthInRangeImage, dilationImage, element );
+    }
+}
+
+void ObjectRecognition::getObjectContour() {
+    if(dilationImage.cols > 0 && rgbImage.cols >0) {
+        objectImage = cv::Mat(rgbImage.rows, rgbImage.cols, CV_8UC3, cv::Scalar(0,0,0));
+        for(int i = 0; i < dilationImage.rows; i++) { 
+            for(int j = 0; j < dilationImage.cols; j++) {
+                if(dilationImage.at<char>(i,j) != 0) {
+                    objectImage.at<cv::Vec3b>(i,j) = rgbImage.at<cv::Vec3b>(i,j);
+                }
+            }   
+        }
+    }
+}
+
+// ===========================================================================================
+
+int main(int argc, char** argv)
+{
+    ObjectRecognition object_recognition(argc, argv);
+    object_recognition.flagShowScreen = 1;
+    ros::Rate r(10); // 10 hz
+    while(ros::ok()) {
+        ros::spinOnce();
+        if(object_recognition.flagShowScreen) {
+            object_recognition.showCombineImages();
+        
+        }
+        r.sleep();
+    }
+    return 0;
+}
 
 //     int calcNumTrainingPerson(const char * filename)
 //     {
@@ -118,20 +169,20 @@ void ObjectRecognition::showCombineImages() {
 //           // open the input file
 //         if( !(imgListFile = fopen(filename, "r")) )
 //         {
-//     	   fprintf(stderr, "Can\'t open file %s\n", filename);
-//     	   return 0;
-//     	}
+//         fprintf(stderr, "Can\'t open file %s\n", filename);
+//         return 0;
+//      }
 //           // count the number of faces
 //         while( fgets(imgFilename, 512, imgListFile) ) ++nFaces;
 //         rewind(imgListFile);
 //           //count the number of persons
 //         for(iFace=0; iFace<nFaces; iFace++)
 //         {
-//     	   char personName[256];
-//     	   int personNumber;
-//     	   // read person number (beginning with 1), their name and the image filename.
-//     	   fscanf(imgListFile, "%d %s %s", &personNumber, personName, imgFilename);
-//     	   if (personNumber > person_num) 
+//         char personName[256];
+//         int personNumber;
+//         // read person number (beginning with 1), their name and the image filename.
+//         fscanf(imgListFile, "%d %s %s", &personNumber, personName, imgFilename);
+//         if (personNumber > person_num) 
 //                person_num = personNumber;
 //         }
 //         fclose(imgListFile); 
@@ -199,11 +250,11 @@ void ObjectRecognition::showCombineImages() {
 //         }
 //         // add rectangle to image
 //         cvRectangle(img, cvPoint(faceRect.x, faceRect.y), cvPoint(faceRect.x + faceRect.width-1, faceRect.y + faceRect.height-1), CV_RGB(0,255,0), 1, 8, 0);
-//         faceImg = frl.cropImage(greyImg, faceRect);	// Get the detected face image.
+//         faceImg = frl.cropImage(greyImg, faceRect);  // Get the detected face image.
 //         // Make sure the image is the same dimensions as the training images.
 //         sizedImg = frl.resizeImage(faceImg, frl.faceWidth, frl.faceHeight);
 //         // Give the image a standard brightness and contrast, in case it was too dark or low contrast.
-//         equalizedImg = cvCreateImage(cvGetSize(sizedImg), 8, 1);	// Create an empty greyscale image
+//         equalizedImg = cvCreateImage(cvGetSize(sizedImg), 8, 1); // Create an empty greyscale image
 //         cvEqualizeHist(sizedImg, equalizedImg);
 //         cvReleaseImage( &greyImg );cvReleaseImage( &faceImg );cvReleaseImage( &sizedImg );  
 //         //check again if preempting request is not there!
@@ -224,14 +275,14 @@ void ObjectRecognition::showCombineImages() {
 //                 person_number = calcNumTrainingPerson("train.txt")+1; 
 //             }
 //             char cstr[256];
-//     	    sprintf(cstr, "data/%d_%s%d.pgm", person_number, &goal_argument_[0], add_face_count+1);
+//          sprintf(cstr, "data/%d_%s%d.pgm", person_number, &goal_argument_[0], add_face_count+1);
 //             ROS_INFO("Storing the current face of '%s' into image '%s'.", &goal_argument_[0], cstr);
 //             //save the new training image of the person
 //             cvSaveImage(cstr, equalizedImg, NULL);
-//         	// Append the new person to the end of the training data.
-//         	trainFile = fopen("train.txt", "a");
-//         	fprintf(trainFile, "%d %s %s\n", person_number, &goal_argument_[0], cstr);
-//         	fclose(trainFile);
+//          // Append the new person to the end of the training data.
+//          trainFile = fopen("train.txt", "a");
+//          fprintf(trainFile, "%d %s %s\n", person_number, &goal_argument_[0], cstr);
+//          fclose(trainFile);
 //             if(add_face_count==0)  
 //             {
 //             //get from parameter server how many training imaged should be acquire.
@@ -248,8 +299,8 @@ void ObjectRecognition::showCombineImages() {
 //             text_image <<"A picture of "<< &goal_argument_[0]<< "was added" <<endl;
 //             cvPutText(img, text_image.str().c_str(), cvPoint( 10, 50), &font, textColor);
 //               //check if enough number of training images for the person has been acquired, then the goal is succeed.
-//             if(++add_face_count==add_face_number)	
-//         	{
+//             if(++add_face_count==add_face_number)    
+//          {
                    
 //                 result_.names.push_back(goal_argument_); 
 //                 as_.setSucceeded(result_);
@@ -275,7 +326,7 @@ void ObjectRecognition::showCombineImages() {
 //             float * projectedTestFace=0;
 //             if(!frl.database_updated)
 //               //ROS_INFO("Alert: Database is not updated, You better (re)train from images!");       //BEFORE
-//     	        ROS_WARN("Alert: Database is not updated. Please delete \"facedata.xml\" and re-run!"); //AFTER
+//              ROS_WARN("Alert: Database is not updated. Please delete \"facedata.xml\" and re-run!"); //AFTER
 //             if(frl.nEigens < 1) 
 //             {
 //                 ROS_INFO("NO database available, goal is Aborted");
@@ -308,7 +359,7 @@ void ObjectRecognition::showCombineImages() {
 //                 text_image.str("");
 //                 text_image <<  frl.personNames[nearest-1].c_str()<<" is recognized";
 //                 cvPutText(img, text_image.str().c_str(), cvPoint(faceRect.x, faceRect.y + faceRect.height + 25), &font, textColor);
-//         	   //goal is to recognize_once, therefore set as succeeded.
+//             //goal is to recognize_once, therefore set as succeeded.
 //                 if(goal_id_==0)
 //                 {
 //                     result_.names.push_back(frl.personNames[nearest-1].c_str());
@@ -318,7 +369,7 @@ void ObjectRecognition::showCombineImages() {
 //                 //goal is recognize continuous, provide feedback and continue.
 //                 else
 //                 {
-//         	        ROS_INFO("detected %s  confidence %f ",  frl.personNames[nearest-1].c_str(),confidence);              
+//                  ROS_INFO("detected %s  confidence %f ",  frl.personNames[nearest-1].c_str(),confidence);              
 //                     feedback_.names.clear();
 //                     feedback_.confidence.clear();
 //                     feedback_.names.push_back(frl.personNames[nearest-1].c_str());
@@ -328,21 +379,3 @@ void ObjectRecognition::showCombineImages() {
 //             }
 //         }
 //     }
-
-
-int main(int argc, char** argv)
-{
-    ObjectRecognition object_recognition(argc, argv);
-    object_recognition.flagShowScreen = 1;
-    ros::Rate r(10); // 10 hz
-    while(ros::ok()) {
-        // printf("max:%d\n", object_recognition.testOut);
-        ros::spinOnce();
-        if(object_recognition.flagShowScreen) {
-            object_recognition.showCombineImages();
-        }
-        r.sleep();
-    }
-    return 0;
-}
-

@@ -14,9 +14,10 @@ public:
 	ObjectRecognition(int argc, char** argv);
 	~ObjectRecognition(void);
 	bool flagShowScreen;
-    void showRGBImage();
+    void showImage(cv::Mat image);
     void showDepthImage();
 	void showCombineImages();
+	void showDepthInRangeImage();
 
 private:
 	ros::Publisher chatter_publisher;
@@ -27,11 +28,15 @@ private:
 
 	cv::Mat rgbImage;
 	cv::Mat depthImage;
+	cv::Mat depthInRangeImage;
+	cv::Mat dilationImage;
 	cv::Mat imageCombine;
+	cv::Mat objectImage;
 
     void rgbImageCB(const sensor_msgs::ImageConstPtr& msg);
     void depthImageCB(const sensor_msgs::ImageConstPtr& msg);
-
-
+    void limitRangeDepthImage(float minRange, float maxRange);
+    void dilation();
+    void getObjectContour();
 };
 
