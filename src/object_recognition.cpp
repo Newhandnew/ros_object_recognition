@@ -9,13 +9,16 @@
 // #include <sys/stat.h>
 // #include <termios.h>
 //#include <term.h>
-
+#include <ros/package.h> //to get pkg path
+#include <sys/stat.h> 
 
 using namespace std;
 
 ObjectRecognition::ObjectRecognition(int argc, char** argv) {
     ros::init(argc, argv, "object_recognition");
     ros::NodeHandle n;
+    imageSavedCount = 0;
+    path = ros::package::getPath("object_recognition");     // get pkg path
     // face_recognition_feedback = n.subscribe("/face_recognition/feedback", 10, &QNode::feedbackCB, this);
     rgb_image_receiver = n.subscribe("/camera/rgb/image_raw", 1, &ObjectRecognition::rgbImageCB, this);
     depth_image_receiver = n.subscribe("/camera/depth/image_raw", 1, &ObjectRecognition::depthImageCB, this);
@@ -187,8 +190,16 @@ void ObjectRecognition::showObjectImage() {
     }
 }
 
-void ObjectRecognition::saveObjectImage() {
-    
+void ObjectRecognition::saveObjectImages(cv::Mat image) {
+    char saveFileName[256];
+    chdir(path.c_str());
+    mkdir("data",S_IRWXU | S_IRWXG | S_IRWXO); 
+    sprintf(saveFileName, "data/%s%d.pgm", "object", imageSavedCount++);
+    // rgb to gray and equalization
+    cv::Mat objectImageProcessed;
+    cv::cvtColor(image, objectImageProcessed, CV_RGB2GRAY);
+    cv::equalizeHist( objectImageProcessed, objectImageProcessed );     // equalization
+    cv::imwrite(saveFileName, objectImageProcessed);
 }
 
 void ObjectRecognition::keyInputEvent() {
@@ -198,7 +209,10 @@ void ObjectRecognition::keyInputEvent() {
             showObjectImage();
             break;
         case 's':
-            saveObjectImage();
+            saveObjectImages(objectImage(boundRect[maxContourIndex]));
+            break;
+        case 'l':
+            printf("dir: %s", path.c_str());
             break;
         case 27:    // ESC = 17
             exit(1);

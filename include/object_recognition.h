@@ -35,7 +35,10 @@ private:
 	cv::Mat imageCombine;
 	cv::Mat objectImage;
 	cv::vector<cv::Rect> boundRect;
+
 	char maxContourIndex;
+	char imageSavedCount;
+	std::string path;
 
     void rgbImageCB(const sensor_msgs::ImageConstPtr& msg);
     void depthImageCB(const sensor_msgs::ImageConstPtr& msg);
@@ -44,6 +47,6 @@ private:
     void objectFusionImage();
     void getObjectContour();
     void drawObjectRectangle(cv::Mat image);
-    void saveObjectImage();
+    void saveObjectImages(cv::Mat image);
 };
 
