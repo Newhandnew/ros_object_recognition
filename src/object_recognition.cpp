@@ -74,15 +74,15 @@ void ObjectRecognition::showDepthImage() {
 }
 
 void ObjectRecognition::showCombineImages() {
-    int dstWidth = rgbImage.cols * 2;
+    int dstWidth = rgbImage.cols * 3;
     int dstHeight = rgbImage.rows * 2;
     if(dstWidth > 0) {
-        // RGB image processing
+        // image1: RGB image processing
         cv::Mat dst = cv::Mat(dstHeight, dstWidth, CV_8UC3, cv::Scalar(0,0,0));
         cv::Rect roi(cv::Rect(0, 0, rgbImage.cols, rgbImage.rows));
         cv::Mat targetROI = dst(roi);
         rgbImage.copyTo(targetROI);
-        // depth image processing
+        // image2: depth image processing
         cv::Mat adjDepthImage, rgbDepthImage;
         double maxRange = 8000;     // set max range to scale down image value
         depthImage.convertTo(adjDepthImage, CV_8UC1, 255 / (maxRange), 0);
@@ -90,21 +90,27 @@ void ObjectRecognition::showCombineImages() {
         cv::cvtColor(adjDepthImage, rgbDepthImage, CV_GRAY2RGB);
         targetROI = dst(cv::Rect(rgbImage.cols, 0, depthImage.cols, depthImage.rows));
         rgbDepthImage.copyTo(targetROI);
-        // limit range and dilation image processing
+        // image3: limit range and dilation image processing
         limitRangeDepthImage(200, 1000);
         dilation();
         // change gray image to rgb image and show
         cv::cvtColor(dilationImage, rgbDepthImage, CV_GRAY2RGB);
-        targetROI = dst(cv::Rect(0, depthImage.rows, depthImage.cols, depthImage.rows));
+        targetROI = dst(cv::Rect(depthImage.cols * 2, 0, depthImage.cols, depthImage.rows));
         rgbDepthImage.copyTo(targetROI);
-        // image fusion get object contour
+        // image4: image fusion get object contour
+        objectFusionImage();
+        targetROI = dst(cv::Rect(0, depthImage.rows, depthImage.cols, depthImage.rows));
+        objectImage.copyTo(targetROI);  
+        // image5: get draw rectangle in rgb image
         getObjectContour();
-        targetROI = dst(cv::Rect(depthImage.cols, depthImage.rows, depthImage.cols, depthImage.rows));
-        objectImage.copyTo(targetROI);
+        drawObjectRectangle(rgbImage);
+        targetROI = dst(cv::Rect(rgbImage.cols, rgbImage.rows, rgbImage.cols, rgbImage.rows));
+        rgbImage.copyTo(targetROI); 
+
         // resize
         cv::resize(dst, dst, cv::Size(), 0.7, 0.7, cv::INTER_LINEAR);
         cv::imshow("Show images", dst);
-        cvWaitKey(1);
+        // cvWaitKey(1);
     }
 }
 
@@ -123,14 +129,15 @@ void ObjectRecognition::limitRangeDepthImage(float minRange, float maxRange) {
 
 void ObjectRecognition::dilation() {
     if(depthInRangeImage.cols > 0) {
-        char dilation_size = 10;
+        char dilation_size = 3;        // chnage this setting if necessary
         cv::Mat element = getStructuringElement( cv::MORPH_RECT, cv::Size(2 * dilation_size + 1, 2 * dilation_size + 1), cv::Point(dilation_size, dilation_size));
         cv::dilate( depthInRangeImage, dilationImage, element );
     }
 }
 
-void ObjectRecognition::getObjectContour() {
+void ObjectRecognition::objectFusionImage() {
     if(dilationImage.cols > 0 && rgbImage.cols >0) {
+        // fusion object contour to rgb image
         objectImage = cv::Mat(rgbImage.rows, rgbImage.cols, CV_8UC3, cv::Scalar(0,0,0));
         for(int i = 0; i < dilationImage.rows; i++) { 
             for(int j = 0; j < dilationImage.cols; j++) {
@@ -139,6 +146,63 @@ void ObjectRecognition::getObjectContour() {
                 }
             }   
         }
+    }
+}
+
+void ObjectRecognition::getObjectContour() {
+    if(objectImage.cols > 0) {
+        // get contour rectangle image
+        cv::vector<cv::vector<cv::Point> > contours; // Vector for storing contour
+        cv::vector<cv::Vec4i> hierarchy;
+        int areaThreshold = 60;
+        int maxArea = 0;
+        cv::findContours(dilationImage, contours, hierarchy, CV_RETR_CCOMP, CV_CHAIN_APPROX_SIMPLE); // Find the contours in the image
+        boundRect.resize(contours.size());
+        for( int i = 0; i< contours.size(); i++ ) // iterate through each contour. 
+        {
+            double area = cv::contourArea(contours[i],false);  //  Find the area of contour
+            if(area > areaThreshold){
+                boundRect[i] = cv::boundingRect(contours[i]); // Find bounding rectangle
+                // get max area index
+                if(area > maxArea) {
+                    maxArea = area;
+                    maxContourIndex = i;
+                }
+            }
+        }
+    }
+}
+
+void ObjectRecognition::drawObjectRectangle(cv::Mat image) {
+    if(boundRect.size() > 0) {
+        for(int i = 0; i < boundRect.size(); i++) {
+            rectangle(image, boundRect[i], cv::Scalar(0, 0, 255), 2, 8, 0);
+        }
+    }
+}
+
+void ObjectRecognition::showObjectImage() {
+    if(boundRect.size() > 0) {
+        showImage(objectImage(boundRect[maxContourIndex]));
+    }
+}
+
+void ObjectRecognition::saveObjectImage() {
+    
+}
+
+void ObjectRecognition::keyInputEvent() {
+    char keyInput = cvWaitKey(1);
+    switch(keyInput) {
+        case 'c':
+            showObjectImage();
+            break;
+        case 's':
+            saveObjectImage();
+            break;
+        case 27:    // ESC = 17
+            exit(1);
+            break;
     }
 }
 
@@ -153,6 +217,7 @@ int main(int argc, char** argv)
         ros::spinOnce();
         if(object_recognition.flagShowScreen) {
             object_recognition.showCombineImages();
+            object_recognition.keyInputEvent();
         
         }
         r.sleep();

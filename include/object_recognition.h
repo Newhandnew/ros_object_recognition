@@ -18,6 +18,8 @@ public:
     void showDepthImage();
 	void showCombineImages();
 	void showDepthInRangeImage();
+	void showObjectImage();
+	void keyInputEvent();
 
 private:
 	ros::Publisher chatter_publisher;
@@ -32,11 +34,16 @@ private:
 	cv::Mat dilationImage;
 	cv::Mat imageCombine;
 	cv::Mat objectImage;
+	cv::vector<cv::Rect> boundRect;
+	char maxContourIndex;
 
     void rgbImageCB(const sensor_msgs::ImageConstPtr& msg);
     void depthImageCB(const sensor_msgs::ImageConstPtr& msg);
     void limitRangeDepthImage(float minRange, float maxRange);
     void dilation();
+    void objectFusionImage();
     void getObjectContour();
+    void drawObjectRectangle(cv::Mat image);
+    void saveObjectImage();
 };
 
