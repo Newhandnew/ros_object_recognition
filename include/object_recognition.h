@@ -14,12 +14,17 @@ public:
 	ObjectRecognition(int argc, char** argv);
 	~ObjectRecognition(void);
 	bool flagShowScreen;
+	bool flagSaveImage;
     void showImage(cv::Mat image);
     void showDepthImage();
 	void showCombineImages();
 	void showDepthInRangeImage();
 	void showObjectImage();
 	void keyInputEvent();
+	void saveTrainingSet(const char objectName[]);
+
+protected:
+	FILE *trainFile; 
 
 private:
 	ros::Publisher chatter_publisher;
@@ -38,6 +43,8 @@ private:
 
 	char maxContourIndex;
 	char imageSavedCount;
+	int objectIndex;
+	static const char numTrainingSet = 25;
 	std::string path;
 
     void rgbImageCB(const sensor_msgs::ImageConstPtr& msg);
@@ -47,6 +54,6 @@ private:
     void objectFusionImage();
     void getObjectContour();
     void drawObjectRectangle(cv::Mat image);
-    void saveObjectImages(cv::Mat image);
+    void saveObjectImages(cv::Mat image, const char objectName[]);
 };
 

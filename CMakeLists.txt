@@ -110,7 +110,7 @@ include_directories(
 # add_library(face_recognition_lib src/face_recognition_lib.cpp)
 
 ## Declare a cpp executable
-add_executable(object_recognition src/object_recognition.cpp)
+add_executable(object_recognition src/object_recognition.cpp src/haar_train_recognition.cpp)
 # add_executable(Fclient src/face_rec_client.cpp)
 
 ## Add cmake target dependencies of the executable/library
