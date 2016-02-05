@@ -11,6 +11,7 @@
 //#include <term.h>
 #include <ros/package.h> //to get pkg path
 #include <sys/stat.h> 
+#include "haar_train_recognition.h"
 
 using namespace std;
 
@@ -20,7 +21,7 @@ ObjectRecognition::ObjectRecognition(int argc, char** argv) {
     imageSavedCount = 0;
     // numTrainingSet(25);
     flagSaveImage = false;
-    objectIndex = 0;
+    objectIndex = 1;
     path = ros::package::getPath("object_recognition");     // get pkg path
     // face_recognition_feedback = n.subscribe("/face_recognition/feedback", 10, &QNode::feedbackCB, this);
     rgb_image_receiver = n.subscribe("/camera/rgb/image_raw", 1, &ObjectRecognition::rgbImageCB, this);
@@ -221,36 +222,34 @@ void ObjectRecognition::saveTrainingSet(const char objectName[]) {
     }
 }
 
-void ObjectRecognition::keyInputEvent() {
-    char keyInput = cvWaitKey(1);
-    switch(keyInput) {
-        case 'c':
-            showObjectImage();
-            break;
-        case 's':
-            flagSaveImage = true;
-            break;
-        case 'l':
-            printf("dir: %s", path.c_str());
-            break;
-        case 27:    // ESC = 17
-            exit(1);
-            break;
-    }
-}
-
 // ===========================================================================================
 
 int main(int argc, char** argv)
 {
     ObjectRecognition object_recognition(argc, argv);
+    HaarTrainRecognition trainModel;
+    trainModel.writeWorkingSpace(object_recognition.path.c_str());
     object_recognition.flagShowScreen = 1;
     ros::Rate r(10); // 10 hz
     while(ros::ok()) {
         ros::spinOnce();
         if(object_recognition.flagShowScreen) {
             object_recognition.showCombineImages();
-            object_recognition.keyInputEvent();
+            char keyInput = cvWaitKey(1);
+            switch(keyInput) {
+                case 'c':
+                    object_recognition.showObjectImage();
+                    break;
+                case 's':
+                    object_recognition.flagSaveImage = true;
+                    break;
+                case 'l':
+                    trainModel.learn("train.txt");
+                    break;
+                case 27:    // ESC = 17
+                    exit(1);
+                    break;
+            }
             object_recognition.saveTrainingSet("object");
         }
         r.sleep();

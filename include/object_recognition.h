@@ -20,8 +20,8 @@ public:
 	void showCombineImages();
 	void showDepthInRangeImage();
 	void showObjectImage();
-	void keyInputEvent();
 	void saveTrainingSet(const char objectName[]);
+	std::string path;
 
 protected:
 	FILE *trainFile; 
@@ -45,7 +45,6 @@ private:
 	char imageSavedCount;
 	int objectIndex;
 	static const char numTrainingSet = 25;
-	std::string path;
 
     void rgbImageCB(const sensor_msgs::ImageConstPtr& msg);
     void depthImageCB(const sensor_msgs::ImageConstPtr& msg);
