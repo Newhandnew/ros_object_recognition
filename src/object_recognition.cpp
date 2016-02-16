@@ -38,6 +38,18 @@ ObjectRecognition::~ObjectRecognition(void) {
     }
 }
 
+void ObjectRecognition::setFlagShowScreen(bool flag) {
+    flagShowScreen = flag;
+}
+
+void ObjectRecognition::setFlagSaveImage(bool flag) {
+    flagSaveImage = flag;
+}
+
+const char* ObjectRecognition::getWorkingSpacePath() {
+    return path.c_str();
+}
+
 void ObjectRecognition::rgbImageCB(const sensor_msgs::ImageConstPtr& pRGBInput) {
     // Convert ROS images to OpenCV
     try
@@ -188,12 +200,17 @@ void ObjectRecognition::drawObjectRectangle(cv::Mat image) {
     }
 }
 
-void ObjectRecognition::showObjectImage() {
+void ObjectRecognition::showMaxObjectImage() {
     if(boundRect.size() > 0) {
         showImage(objectImage(boundRect[maxContourIndex]));
     }
 }
 
+IplImage ObjectRecognition::getObjectImage() {
+    return IplImage(objectImage);
+}
+
+// equalized and save image
 void ObjectRecognition::saveObjectImages(cv::Mat image, const char objectName[]) {
     char saveFileName[256];
     chdir(path.c_str());
@@ -222,29 +239,87 @@ void ObjectRecognition::saveTrainingSet(const char objectName[]) {
     }
 }
 
+// ============================================================
+// void recognition(cv::Mat inputMatImage);
+// void recognition(cv::Mat inputMatImage) {
+//     IplImage *inputImage = IplImage(inputMatImage);
+//     int iNearest, nearest;
+//     float confidence;
+//     float * projectedTestObject=0;
+
+//     // Check which person it is most likely to be.
+//     iNearest = frl.findNearestNeighbor(projectedTestObject, &confidence);
+//     nearest  = frl.trainPersonNumMat->data.i[iNearest];
+//     //get the desired confidence value from the parameter server
+//     ros::param::getCached("~confidence_value", confidence_value);
+//     cvFree(&projectedTestObject);
+//     if(confidence<confidence_value)
+//     {
+//         ROS_INFO("Confidence is less than %f was %f, detected object is not considered.",(float)confidence_value, (float)confidence);
+//         // add warning message to image
+//         text_image.str("");
+//         text_image << "Confidence is less than "<< confidence_value;
+//         cvPutText(img, text_image.str().c_str(), cvPoint(objectRect.x, objectRect.y + objectRect.height + 25), &font, textColor);
+//     }
+//     else
+//     {
+//         // add recognized name to image
+//         text_image.str("");
+//         text_image <<  frl.personNames[nearest-1].c_str()<<" is recognized";
+//         cvPutText(img, text_image.str().c_str(), cvPoint(objectRect.x, objectRect.y + objectRect.height + 25), &font, textColor);
+//        //goal is to recognize_once, therefore set as succeeded.
+//         if(goal_id_==0)
+//         {
+//             result_.names.push_back(frl.personNames[nearest-1].c_str());
+//             result_.confidence.push_back(confidence);
+//             as_.setSucceeded(result_);
+//         }
+//         //goal is recognize continuous, provide feedback and continue.
+//         else
+//         {
+//             ROS_INFO("detected %s  confidence %f ",  frl.personNames[nearest-1].c_str(),confidence);              
+//             feedback_.names.clear();
+//             feedback_.confidence.clear();
+//             feedback_.names.push_back(frl.personNames[nearest-1].c_str());
+//             feedback_.confidence.push_back(confidence);
+//             as_.publishFeedback(feedback_);                
+//         }                        
+//     }
+// }
+
 // ===========================================================================================
 
 int main(int argc, char** argv)
 {
+    bool fShowScreen = true;
+    float confidence;
+    IplImage objectImage;
+    int iNearest;
+
     ObjectRecognition object_recognition(argc, argv);
-    HaarTrainRecognition trainModel;
-    trainModel.writeWorkingSpace(object_recognition.path.c_str());
-    object_recognition.flagShowScreen = 1;
+    HaarTrainRecognition trainModel(object_recognition.getWorkingSpacePath());
+    // trainModel.writeWorkingSpace(object_recognition.getWorkingSpacePath());
+    object_recognition.setFlagShowScreen(fShowScreen);
     ros::Rate r(10); // 10 hz
     while(ros::ok()) {
         ros::spinOnce();
-        if(object_recognition.flagShowScreen) {
+        if(fShowScreen) {
             object_recognition.showCombineImages();
             char keyInput = cvWaitKey(1);
             switch(keyInput) {
-                case 'c':
-                    object_recognition.showObjectImage();
+                case 'o':   // object
+                    object_recognition.showMaxObjectImage();
                     break;
-                case 's':
-                    object_recognition.flagSaveImage = true;
+                case 's':   // save
+                    object_recognition.setFlagSaveImage(true);
                     break;
-                case 'l':
+                case 'l':   // learn
                     trainModel.learn("train.txt");
+                    break;
+                case 'r':   // recognition
+                    objectImage = object_recognition.getObjectImage();
+                    iNearest = trainModel.findNearestNeighbor(&objectImage, &confidence);
+                    printf("result is: %d and confidence: %f\n", iNearest, confidence);
                     break;
                 case 27:    // ESC = 17
                     exit(1);

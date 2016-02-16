@@ -9,19 +9,20 @@ using namespace cv;
 
 class HaarTrainRecognition {
 public:
-	HaarTrainRecognition();
+	HaarTrainRecognition(const char *inputWorkingSpace);
 	~HaarTrainRecognition();
 	bool fSaveEigenImage;
 	bool learn(const char *szFileTrain);
 	void writeWorkingSpace(const char *);
-
+	int  findNearestNeighbor(IplImage *inputImage, float *pConfidence);
+	
 private:
 	// Global variables
 	IplImage ** objectImgArr; // array of object images
-	vector<string> personNames;			// array of person names (indexed by the person number). Added by Shervin.
+	vector<string> objectNames;			// array of object names (indexed by the object number). Added by Shervin.
 	// int objectWidth;	// Default dimensions for objects in the object recognition database. Added by Shervin.
 	// int objectHeight;	//	"		"		"		"		"		"
-	int nPersons; // the number of people in the training set. Added by Shervin.
+	int nObjects; // the number of people in the training set. Added by Shervin.
 	int nTrainObjects; // the number of training images
 	int nEigens; // the number of eigenvalues
 	IplImage * pAvgTrainImg; // the average image
@@ -29,7 +30,7 @@ private:
 	CvMat * eigenValMat; // eigenvalues
 	CvMat * projectedTrainObjectMat; // projected training objects
 	// CvHaarClassifierCascade* objectCascade;
-	CvMat * trainPersonNumMat;  // the person numbers during training
+	CvMat * trainObjectNumMat;  // the object numbers during training
 	bool database_updated;
 	//Functions:
 	int  loadObjectImgArray(const char * filename);
@@ -38,9 +39,7 @@ private:
 	void storeTrainingData();
 	void storeEigenobjectImages();
 	
-	int  loadTrainingData(CvMat ** pTrainPersonNumMat);
-	int  findNearestNeighbor(float * projectedTestObject);
-	int  findNearestNeighbor(float * projectedTestObject, float *pConfidence);
+	int  loadTrainingData(CvMat ** ptrainObjectNumMat);
 	IplImage* convertFloatImageToUcharImage(const IplImage *srcImg);
 	// bool retrainOnline(void);
 };

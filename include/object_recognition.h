@@ -13,15 +13,18 @@ class ObjectRecognition {
 public:
 	ObjectRecognition(int argc, char** argv);
 	~ObjectRecognition(void);
-	bool flagShowScreen;
-	bool flagSaveImage;
+
+	void setFlagShowScreen(bool);
+	void setFlagSaveImage(bool);
+	const char* getWorkingSpacePath();
+
     void showImage(cv::Mat image);
     void showDepthImage();
 	void showCombineImages();
 	void showDepthInRangeImage();
-	void showObjectImage();
+	void showMaxObjectImage();
 	void saveTrainingSet(const char objectName[]);
-	std::string path;
+	IplImage getObjectImage();
 
 protected:
 	FILE *trainFile; 
@@ -41,9 +44,12 @@ private:
 	cv::Mat objectImage;
 	cv::vector<cv::Rect> boundRect;
 
+	bool flagShowScreen;
+	bool flagSaveImage;
 	char maxContourIndex;
 	char imageSavedCount;
 	int objectIndex;
+	std::string path;
 	static const char numTrainingSet = 25;
 
     void rgbImageCB(const sensor_msgs::ImageConstPtr& msg);

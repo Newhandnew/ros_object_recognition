@@ -4,12 +4,12 @@
 
 //#define USE_MAHALANOBIS_DISTANCE	// You might get better recognition accuracy if you enable this.
 
-HaarTrainRecognition::HaarTrainRecognition() {
+HaarTrainRecognition::HaarTrainRecognition(const char *inputWorkingSpace) {
 	fSaveEigenImage = 1;		// Set to 0 if you don't want images of the Eigenvectors saved to files (for debugging).
 	objectImgArr = 0;
 	// objectWidth = 120;
 	// objectHeight = 90;
-	nPersons = 0;
+	nObjects = 0;
 	nTrainObjects = 0;
 	nEigens = 0;
 	pAvgTrainImg = 0;
@@ -18,25 +18,16 @@ HaarTrainRecognition::HaarTrainRecognition() {
 	projectedTrainObjectMat = 0;
 	database_updated = false;
 
+	writeWorkingSpace(inputWorkingSpace);	// write working space
 	// Load the previously saved training data
-	trainPersonNumMat = 0;
-	// if ( loadTrainingData( &trainPersonNumMat ) )
-	// {
-	// 	// objectWidth = pAvgTrainImg->width;
-	// 	// objectHeight = pAvgTrainImg->height;
-	// 	database_updated = true;
-	// }
-	// else
-	// {
-	// 	printf("Will try to train from images");
-	// 	if (!retrainOnline())
-	// 		printf("Could not train from images");
+	trainObjectNumMat = 0;
+	loadTrainingData(&trainObjectNumMat);
 
-	// }
 }
+
 HaarTrainRecognition::~HaarTrainRecognition(void) {
 	// cvReleaseHaarClassifierCascade( &objectCascade );
-	if (trainPersonNumMat)	cvReleaseMat( &trainPersonNumMat );
+	if (trainObjectNumMat)	cvReleaseMat( &trainObjectNumMat );
 	int i;
 	if (objectImgArr)
 	{
@@ -50,8 +41,7 @@ HaarTrainRecognition::~HaarTrainRecognition(void) {
 			if (eigenVectArr[i])      cvReleaseImage( &eigenVectArr[i] );
 		cvFree( &eigenVectArr );
 	}
-	if (trainPersonNumMat) cvReleaseMat( &trainPersonNumMat );
-	personNames.clear();
+	objectNames.clear();
 	if (pAvgTrainImg) cvReleaseImage( &pAvgTrainImg );
 	if (eigenValMat)  cvReleaseMat( &eigenValMat );
 	if (projectedTrainObjectMat) cvReleaseMat( &projectedTrainObjectMat );
@@ -175,9 +165,9 @@ int HaarTrainRecognition::loadObjectImgArray(const char * filename)
 {
 	FILE * imgListFile = 0;
 	char imgFilename[512];
-	int iObject, nObjects = 0;
+	int iPicture, nPictures = 0;
 	int i;
-	IplImage *pobjectImg;
+	IplImage *pObjectImg;
 	IplImage *psizedImg;
 	IplImage *pequalizedImg;
 	int imgWidth;
@@ -190,53 +180,53 @@ int HaarTrainRecognition::loadObjectImgArray(const char * filename)
 	}
 
 	// count the number of objects
-	while ( fgets(imgFilename, 512, imgListFile) ) ++nObjects;
+	while ( fgets(imgFilename, 512, imgListFile) ) ++nPictures;
 	rewind(imgListFile);
 
-	// allocate the object-image array and person number matrix
-	objectImgArr        = (IplImage **)cvAlloc( nObjects * sizeof(IplImage *) );
-	trainPersonNumMat = cvCreateMat( 1, nObjects, CV_32SC1 );
+	// allocate the object-image array and object number matrix
+	objectImgArr        = (IplImage **)cvAlloc( nPictures * sizeof(IplImage *) );
+	trainObjectNumMat = cvCreateMat( 1, nPictures, CV_32SC1 );
 
-	personNames.clear();	// Make sure it starts as empty.
-	nPersons = 0;
+	objectNames.clear();	// Make sure it starts as empty.
+	nObjects = 0;
 
 	// store the object images in an array
-	for (iObject = 0; iObject < nObjects; iObject++)
+	for (iPicture = 0; iPicture < nPictures; iPicture++)
 	{
-		char personName[256];
+		char objectName[256];
 		string sPersonName;
-		int personNumber;
-		// read person number (beginning with 1), their name and the image filename.
-		fscanf(imgListFile, "%d %s %s", &personNumber, personName, imgFilename);
-		sPersonName = personName;
-		//printf("Got %d: %d, <%s>, <%s>.\n", iObject, personNumber, personName, imgFilename);
+		int objectNumber;
+		// read object number (beginning with 1), their name and the image filename.
+		fscanf(imgListFile, "%d %s %s", &objectNumber, objectName, imgFilename);
+		sPersonName = objectName;
+		//printf("Got %d: %d, <%s>, <%s>.\n", iPicture, objectNumber, objectName, imgFilename);
 
-		// Check if a new person is being loaded.
-		if (personNumber > nPersons) {
-			// Allocate memory for the extra person (or possibly multiple), using this new person's name.
-			for (i = nPersons; i < personNumber; i++) {
-				personNames.push_back( sPersonName );
+		// Check if a new object is being loaded.
+		if (objectNumber > nObjects) {
+			// Allocate memory for the extra object (or possibly multiple), using this new object's name.
+			for (i = nObjects; i < objectNumber; i++) {
+				objectNames.push_back( sPersonName );
 			}
-			nPersons = personNumber;
-			//printf("Got new person <%s> -> nPersons = %d [%d]\n", sPersonName.c_str(), nPersons, personNames.size());
+			nObjects = objectNumber;
+			//printf("Got new object <%s> -> nObjects = %d [%d]\n", sPersonName.c_str(), nObjects, objectNames.size());
 		}
 
 		// Keep the data
-		trainPersonNumMat->data.i[iObject] = personNumber;
+		trainObjectNumMat->data.i[iPicture] = objectNumber;
 
 		// load the object image
-		pobjectImg = cvLoadImage(imgFilename, CV_LOAD_IMAGE_GRAYSCALE);
-		if(iObject == 0) {
-			imgWidth = pobjectImg->width;
-			imgHeight = pobjectImg->height;
+		pObjectImg = cvLoadImage(imgFilename, CV_LOAD_IMAGE_GRAYSCALE);
+		if(iPicture == 0) {
+			imgWidth = pObjectImg->width;
+			imgHeight = pObjectImg->height;
 		}
-		psizedImg = resizeImage(pobjectImg, imgWidth, imgHeight);
+		psizedImg = resizeImage(pObjectImg, imgWidth, imgHeight);
 		// Give the image a standard brightness and contrast, in case it was too dark or low contrast.
 		pequalizedImg = cvCreateImage(cvGetSize(psizedImg), 8, 1);	// Create an empty greyscale image
 		cvEqualizeHist(psizedImg, pequalizedImg);
-		objectImgArr[iObject] = pequalizedImg;
-		cvReleaseImage( &psizedImg ); cvReleaseImage( &pobjectImg );
-		if ( !objectImgArr[iObject] )
+		objectImgArr[iPicture] = pequalizedImg;
+		cvReleaseImage( &psizedImg ); cvReleaseImage( &pObjectImg );
+		if ( !objectImgArr[iPicture] )
 		{
 			fprintf(stderr, "Can\'t load image from %s\n", imgFilename);
 			return 0;
@@ -245,16 +235,16 @@ int HaarTrainRecognition::loadObjectImgArray(const char * filename)
 
 	fclose(imgListFile);
 
-	printf("Data loaded from '%s': (%d images of %d people).\n", filename, nObjects, nPersons);
+	printf("Data loaded from '%s': (%d images of %d objects).\n", filename, nPictures, nObjects);
 	printf("object: ");
-	if (nPersons > 0)
-		printf("<%s>", personNames[0].c_str());
-	for (i = 1; i < nPersons; i++) {
-		printf(", <%s>", personNames[i].c_str());
+	if (nObjects > 0)
+		printf("<%s>", objectNames[0].c_str());
+	for (i = 1; i < nObjects; i++) {
+		printf(", <%s>", objectNames[i].c_str());
 	}
 	printf(".\n");
 
-	return nObjects;
+	return nPictures;
 }
 
 
@@ -284,7 +274,7 @@ void HaarTrainRecognition::doPCA()
 
 	// set the PCA termination criterion
 	calcLimit = cvTermCriteria( CV_TERMCRIT_ITER, nEigens, 1);
-	printf("**** nTrainObjects: %d", nTrainObjects);
+	printf("**** nTrainObjects: %d\n", nTrainObjects);
 	// compute average image, eigenvalues, and eigenvectors
 	cvCalcEigenObjects(
 	    nTrainObjects,
@@ -309,18 +299,18 @@ void HaarTrainRecognition::storeTrainingData()
 	// create a file-storage interobject
 	fileStorage = cvOpenFileStorage( "objectdata.xml", 0, CV_STORAGE_WRITE );
 
-	// Store the person names. Added by Shervin.
-	cvWriteInt( fileStorage, "nPersons", nPersons );
-	for (i = 0; i < nPersons; i++) {
+	// Store the object names. Added by Shervin.
+	cvWriteInt( fileStorage, "nObjects", nObjects );
+	for (i = 0; i < nObjects; i++) {
 		char varname[200];
-		sprintf( varname, "personName_%d", (i + 1) );
-		cvWriteString(fileStorage, varname, personNames[i].c_str(), 0);
+		sprintf( varname, "objectName_%d", (i + 1) );
+		cvWriteString(fileStorage, varname, objectNames[i].c_str(), 0);
 	}
 
 	// store all the data
 	cvWriteInt( fileStorage, "nEigens", nEigens );
 	cvWriteInt( fileStorage, "nTrainObjects", nTrainObjects );
-	cvWrite(fileStorage, "trainPersonNumMat", trainPersonNumMat, cvAttrList(0, 0));
+	cvWrite(fileStorage, "trainObjectNumMat", trainObjectNumMat, cvAttrList(0, 0));
 	cvWrite(fileStorage, "eigenValMat", eigenValMat, cvAttrList(0, 0));
 	cvWrite(fileStorage, "projectedTrainObjectMat", projectedTrainObjectMat, cvAttrList(0, 0));
 	cvWrite(fileStorage, "avgTrainImg", pAvgTrainImg, cvAttrList(0, 0));
@@ -338,11 +328,11 @@ void HaarTrainRecognition::storeTrainingData()
 void HaarTrainRecognition::storeEigenobjectImages()
 {
 	// Store the average image to a file
-	printf("Saving the image of the average object as 'out_averageImage.bmp'.");
+	printf("Saving the image of the average object as 'out_averageImage.bmp'.\n");
 	cvSaveImage("out_averageImage.bmp", pAvgTrainImg);
 	// Create a large image made of many eigenobject images.
 	// Must also convert each eigenobject image to a normal 8-bit UCHAR image instead of a 32-bit float image.
-	printf("Saving the %d eigenvector images as 'out_eigenobjects.bmp'", nEigens);
+	printf("Saving the %d eigenvector images as 'out_eigenobjects.bmp'\n", nEigens);
 	if (nEigens > 0) {
 		// Put all the eigenobjects next to each other.
 		int COLUMNS = 8;	// Put upto 8 images on a row.
@@ -371,7 +361,7 @@ void HaarTrainRecognition::storeEigenobjectImages()
 }
 
 // Open the training data from the file 'objectdata.xml'.
-int HaarTrainRecognition::loadTrainingData(CvMat ** pTrainPersonNumMat)
+int HaarTrainRecognition::loadTrainingData(CvMat ** ptrainObjectNumMat)
 {
 	CvFileStorage * fileStorage;
 	int i;
@@ -383,26 +373,26 @@ int HaarTrainRecognition::loadTrainingData(CvMat ** pTrainPersonNumMat)
 		return 0;
 	}
 
-	// Load the person names. Added by Shervin.
-	personNames.clear();	// Make sure it starts as empty.
-	nPersons = cvReadIntByName( fileStorage, 0, "nPersons", 0 );
-	if (nPersons == 0) {
-		printf("No people found in the training database 'objectdata.xml'.");
+	// Load the object names. Added by Shervin.
+	objectNames.clear();	// Make sure it starts as empty.
+	nObjects = cvReadIntByName( fileStorage, 0, "nObjects", 0 );
+	if (nObjects == 0) {
+		printf("No object found in the training database 'objectdata.xml'.");
 		return 0;
 	}
-	// Load each person's name.
-	for (i = 0; i < nPersons; i++) {
+	// Load each object's name.
+	for (i = 0; i < nObjects; i++) {
 		string sPersonName;
 		char varname[200];
-		sprintf( varname, "personName_%d", (i + 1) );
+		sprintf( varname, "objectName_%d", (i + 1) );
 		sPersonName = cvReadStringByName(fileStorage, 0, varname );
-		personNames.push_back( sPersonName );
+		objectNames.push_back( sPersonName );
 	}
 
 	// Load the data
 	nEigens = cvReadIntByName(fileStorage, 0, "nEigens", 0);
 	nTrainObjects = cvReadIntByName(fileStorage, 0, "nTrainObjects", 0);
-	*pTrainPersonNumMat = (CvMat *)cvReadByName(fileStorage, 0, "trainPersonNumMat", 0);
+	*ptrainObjectNumMat = (CvMat *)cvReadByName(fileStorage, 0, "trainObjectNumMat", 0);
 	eigenValMat  = (CvMat *)cvReadByName(fileStorage, 0, "eigenValMat", 0);
 	projectedTrainObjectMat = (CvMat *)cvReadByName(fileStorage, 0, "projectedTrainObjectMat", 0);
 	pAvgTrainImg = (IplImage *)cvReadByName(fileStorage, 0, "avgTrainImg", 0);
@@ -417,23 +407,44 @@ int HaarTrainRecognition::loadTrainingData(CvMat ** pTrainPersonNumMat)
 	// release the file-storage interobject
 	cvReleaseFileStorage( &fileStorage );
 
-	printf("Training data loaded (%d training images of %d people):", nTrainObjects, nPersons);
-	printf("People: ");
-	if (nPersons > 0)
-		printf("<%s>", personNames[0].c_str());
-	for (i = 1; i < nPersons; i++) {
-		printf(", <%s>", personNames[i].c_str());
+	printf("Training data loaded (%d training images of %d object):", nTrainObjects, nObjects);
+	if (nObjects > 0)
+		printf("<%s>", objectNames[0].c_str());
+	for (i = 1; i < nObjects; i++) {
+		printf(", <%s>", objectNames[i].c_str());
 	}
+	printf("\n");
 	database_updated = true;
 	return 1;
 }
 
-// Find the most likely person based on a detection. Returns the index, and stores the confidence value into pConfidence.
-int HaarTrainRecognition::findNearestNeighbor(float * projectedTestObject, float *pConfidence)
+// Find the most likely object based on a detection. Returns the index, and stores the confidence value into pConfidence.
+int HaarTrainRecognition::findNearestNeighbor(IplImage *inputImage, float *pConfidence)
 {
 	//double leastDistSq = 1e12;
 	double leastDistSq = DBL_MAX;
 	int i, iTrain, iNearest = 0;
+	IplImage *grayImg = cvCreateImage(cvGetSize(inputImage), 8, 1);	// Create an empty greyscale image
+	IplImage *equalizedImg = cvCreateImage(cvGetSize(inputImage), 8, 1);	// Create an empty greyscale image
+	IplImage *psizedImg;
+	float * projectedTestObject = 0;
+	int objectIndex;
+
+	if(nEigens < 1) 
+    {
+        printf("NO database available, goal is Aborted");
+        cvReleaseImage(&equalizedImg);
+        return -1;
+    }
+    cvCvtColor(inputImage, grayImg, CV_RGB2GRAY);
+	cvEqualizeHist(grayImg, equalizedImg);	// equalized image
+	psizedImg = resizeImage(equalizedImg, pAvgTrainImg -> width, pAvgTrainImg -> height);	// resize image
+    // Project the test images onto the PCA subspace
+    projectedTestObject = (float *)cvAlloc( nEigens * sizeof(float));
+    // project the test image onto the PCA subspace
+    cvEigenDecomposite(psizedImg, nEigens, eigenVectArr, 0, 0, pAvgTrainImg, projectedTestObject);
+	
+    // printf("nEigens: %d\n", nEigens);
 
 	for (iTrain = 0; iTrain < nTrainObjects; iTrain++)
 	{
@@ -447,8 +458,9 @@ int HaarTrainRecognition::findNearestNeighbor(float * projectedTestObject, float
 			#else
 			distSq += d_i * d_i; // Euclidean distance.
 			#endif
+			// printf("i =  %d, distSq = %f\n", i, distSq);
 		}
-
+		// get the least distance index
 		if (distSq < leastDistSq)
 		{
 			leastDistSq = distSq;
@@ -462,7 +474,8 @@ int HaarTrainRecognition::findNearestNeighbor(float * projectedTestObject, float
 	*pConfidence = 1.0f - sqrt( leastDistSq / (float)(nTrainObjects * nEigens) ) / 255.0f;
 
 	// Return the found index.
-	return iNearest;
+	objectIndex  = trainObjectNumMat->data.i[iNearest];
+	return objectIndex;
 }
 
 
@@ -474,7 +487,7 @@ int HaarTrainRecognition::findNearestNeighbor(float * projectedTestObject, float
 // bool HaarTrainRecognition::retrainOnline(void)
 // {
 // 	// Free & Re-initialize the global variables.
-// 	if (trainPersonNumMat)	{cvReleaseMat( &trainPersonNumMat ); trainPersonNumMat = 0;}
+// 	if (trainObjectNumMat)	{cvReleaseMat( &trainObjectNumMat ); trainObjectNumMat = 0;}
 // 	int i;
 // 	if (objectImgArr)
 // 	{
@@ -491,9 +504,9 @@ int HaarTrainRecognition::findNearestNeighbor(float * projectedTestObject, float
 // 		eigenVectArr = 0;
 // 	}
 
-// 	if (trainPersonNumMat) {cvReleaseMat( &trainPersonNumMat ); trainPersonNumMat = 0;} // array of person numbers
-// 	personNames.clear();			// array of person names (indexed by the person number). Added by Shervin.
-// 	nPersons = 0; // the number of people in the training set. Added by Shervin.
+// 	if (trainObjectNumMat) {cvReleaseMat( &trainObjectNumMat ); trainObjectNumMat = 0;} // array of object numbers
+// 	objectNames.clear();			// array of object names (indexed by the object number). Added by Shervin.
+// 	nObjects = 0; // the number of people in the training set. Added by Shervin.
 // 	nTrainObjects = 0; // the number of training images
 // 	nEigens = 0; // the number of eigenvalues
 // 	if (pAvgTrainImg) {cvReleaseImage( &pAvgTrainImg ); pAvgTrainImg = 0;} // the average image
