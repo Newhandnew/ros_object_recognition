@@ -3,12 +3,6 @@
 #include <image_transport/image_transport.h>
 #include <cv_bridge/cv_bridge.h>
 #include <sensor_msgs/image_encodings.h>
-// #include <vector>
-// #include <cvaux.h>
-// #include <cxcore.hpp>
-// #include <sys/stat.h>
-// #include <termios.h>
-//#include <term.h>
 #include <ros/package.h> //to get pkg path
 #include <sys/stat.h> 
 #include "haar_train_recognition.h"
@@ -19,9 +13,9 @@ ObjectRecognition::ObjectRecognition(int argc, char** argv) {
     ros::init(argc, argv, "object_recognition");
     ros::NodeHandle n;
     imageSavedCount = 0;
-    // numTrainingSet(25);
     flagSaveImage = false;
     objectIndex = 1;
+
     path = ros::package::getPath("object_recognition");     // get pkg path
     // face_recognition_feedback = n.subscribe("/face_recognition/feedback", 10, &QNode::feedbackCB, this);
     rgb_image_receiver = n.subscribe("/camera/rgb/image_raw", 1, &ObjectRecognition::rgbImageCB, this);
@@ -239,53 +233,6 @@ void ObjectRecognition::saveTrainingSet(const char objectName[]) {
     }
 }
 
-// ============================================================
-// void recognition(cv::Mat inputMatImage);
-// void recognition(cv::Mat inputMatImage) {
-//     IplImage *inputImage = IplImage(inputMatImage);
-//     int iNearest, nearest;
-//     float confidence;
-//     float * projectedTestObject=0;
-
-//     // Check which person it is most likely to be.
-//     iNearest = frl.findNearestNeighbor(projectedTestObject, &confidence);
-//     nearest  = frl.trainPersonNumMat->data.i[iNearest];
-//     //get the desired confidence value from the parameter server
-//     ros::param::getCached("~confidence_value", confidence_value);
-//     cvFree(&projectedTestObject);
-//     if(confidence<confidence_value)
-//     {
-//         ROS_INFO("Confidence is less than %f was %f, detected object is not considered.",(float)confidence_value, (float)confidence);
-//         // add warning message to image
-//         text_image.str("");
-//         text_image << "Confidence is less than "<< confidence_value;
-//         cvPutText(img, text_image.str().c_str(), cvPoint(objectRect.x, objectRect.y + objectRect.height + 25), &font, textColor);
-//     }
-//     else
-//     {
-//         // add recognized name to image
-//         text_image.str("");
-//         text_image <<  frl.personNames[nearest-1].c_str()<<" is recognized";
-//         cvPutText(img, text_image.str().c_str(), cvPoint(objectRect.x, objectRect.y + objectRect.height + 25), &font, textColor);
-//        //goal is to recognize_once, therefore set as succeeded.
-//         if(goal_id_==0)
-//         {
-//             result_.names.push_back(frl.personNames[nearest-1].c_str());
-//             result_.confidence.push_back(confidence);
-//             as_.setSucceeded(result_);
-//         }
-//         //goal is recognize continuous, provide feedback and continue.
-//         else
-//         {
-//             ROS_INFO("detected %s  confidence %f ",  frl.personNames[nearest-1].c_str(),confidence);              
-//             feedback_.names.clear();
-//             feedback_.confidence.clear();
-//             feedback_.names.push_back(frl.personNames[nearest-1].c_str());
-//             feedback_.confidence.push_back(confidence);
-//             as_.publishFeedback(feedback_);                
-//         }                        
-//     }
-// }
 
 // ===========================================================================================
 
