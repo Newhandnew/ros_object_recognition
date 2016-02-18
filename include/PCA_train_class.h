@@ -7,10 +7,10 @@ using namespace std;
 using namespace cv;
 
 
-class HaarTrainRecognition {
+class PCATrainClass {
 public:
-	HaarTrainRecognition(const char *inputWorkingSpace);
-	~HaarTrainRecognition();
+	PCATrainClass(const char *inputWorkingSpace);
+	~PCATrainClass();
 	bool fSaveEigenImage;
 	bool learn(const char *szFileTrain);
 	void writeWorkingSpace(const char *);

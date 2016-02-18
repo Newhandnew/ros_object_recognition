@@ -1,10 +1,10 @@
 #include <cvaux.h>
-#include "haar_train_recognition.h"
+#include "PCA_train_class.h"
 #include <unistd.h>
 
 //#define USE_MAHALANOBIS_DISTANCE	// You might get better recognition accuracy if you enable this.
 
-HaarTrainRecognition::HaarTrainRecognition(const char *inputWorkingSpace) {
+PCATrainClass::PCATrainClass(const char *inputWorkingSpace) {
 	fSaveEigenImage = 1;		// Set to 0 if you don't want images of the Eigenvectors saved to files (for debugging).
 	objectImgArr = 0;
 	// objectWidth = 120;
@@ -25,7 +25,7 @@ HaarTrainRecognition::HaarTrainRecognition(const char *inputWorkingSpace) {
 
 }
 
-HaarTrainRecognition::~HaarTrainRecognition(void) {
+PCATrainClass::~PCATrainClass(void) {
 	// cvReleaseHaarClassifierCascade( &objectCascade );
 	if (trainObjectNumMat)	cvReleaseMat( &trainObjectNumMat );
 	int i;
@@ -47,7 +47,7 @@ HaarTrainRecognition::~HaarTrainRecognition(void) {
 	if (projectedTrainObjectMat) cvReleaseMat( &projectedTrainObjectMat );
 }
 
-void HaarTrainRecognition::writeWorkingSpace(const char *inputWorkingSpace) {
+void PCATrainClass::writeWorkingSpace(const char *inputWorkingSpace) {
 	printf("Current working space path is: %s\n", inputWorkingSpace);
 	chdir(inputWorkingSpace);
 }
@@ -55,7 +55,7 @@ void HaarTrainRecognition::writeWorkingSpace(const char *inputWorkingSpace) {
 
 // Creates a new image copy that is of a desired size.
 // Remember to free the new image later.
-IplImage* HaarTrainRecognition::resizeImage(const IplImage *origImg, int newWidth, int newHeight)
+IplImage* PCATrainClass::resizeImage(const IplImage *origImg, int newWidth, int newHeight)
 {
 	IplImage *outImg = 0;
 	int origWidth;
@@ -87,7 +87,7 @@ IplImage* HaarTrainRecognition::resizeImage(const IplImage *origImg, int newWidt
 
 // Get an 8-bit equivalent of the 32-bit Float image.
 // Returns a new image, so remember to call 'cvReleaseImage()' on the result.
-IplImage* HaarTrainRecognition::convertFloatImageToUcharImage(const IplImage *srcImg)
+IplImage* PCATrainClass::convertFloatImageToUcharImage(const IplImage *srcImg)
 {
 	IplImage *dstImg = 0;
 	if ((srcImg) && (srcImg->width > 0 && srcImg->height > 0)) {
@@ -114,7 +114,7 @@ IplImage* HaarTrainRecognition::convertFloatImageToUcharImage(const IplImage *sr
 }
 
 // Train from the data in the given text file, and store the trained data into the file 'objectdata.xml'.
-bool HaarTrainRecognition::learn(const char *szFileTrain)
+bool PCATrainClass::learn(const char *szFileTrain)
 {
 	int i, offset;
 
@@ -161,7 +161,7 @@ bool HaarTrainRecognition::learn(const char *szFileTrain)
 }
 
 // Read the names & image filenames of people from a text file, and load all those images listed.
-int HaarTrainRecognition::loadObjectImgArray(const char * filename)
+int PCATrainClass::loadObjectImgArray(const char * filename)
 {
 	FILE * imgListFile = 0;
 	char imgFilename[512];
@@ -250,7 +250,7 @@ int HaarTrainRecognition::loadObjectImgArray(const char * filename)
 
 // Do the Principal Component Analysis, finding the average image
 // and the eigenobjects that represent any image in the given dataset.
-void HaarTrainRecognition::doPCA()
+void PCATrainClass::doPCA()
 {
 	int i;
 	CvTermCriteria calcLimit;
@@ -291,7 +291,7 @@ void HaarTrainRecognition::doPCA()
 }
 
 // Save the training data to the file 'objectdata.xml'.
-void HaarTrainRecognition::storeTrainingData()
+void PCATrainClass::storeTrainingData()
 {
 	CvFileStorage * fileStorage;
 	int i;
@@ -325,7 +325,7 @@ void HaarTrainRecognition::storeTrainingData()
 	cvReleaseFileStorage( &fileStorage );
 }
 
-void HaarTrainRecognition::storeEigenobjectImages()
+void PCATrainClass::storeEigenobjectImages()
 {
 	// Store the average image to a file
 	printf("Saving the image of the average object as 'out_averageImage.bmp'.\n");
@@ -361,7 +361,7 @@ void HaarTrainRecognition::storeEigenobjectImages()
 }
 
 // Open the training data from the file 'objectdata.xml'.
-int HaarTrainRecognition::loadTrainingData(CvMat ** ptrainObjectNumMat)
+int PCATrainClass::loadTrainingData(CvMat ** ptrainObjectNumMat)
 {
 	CvFileStorage * fileStorage;
 	int i;
@@ -419,7 +419,7 @@ int HaarTrainRecognition::loadTrainingData(CvMat ** ptrainObjectNumMat)
 }
 
 // Find the most likely object based on a detection. Returns the index, and stores the confidence value into pConfidence.
-int HaarTrainRecognition::findNearestNeighbor(IplImage *inputImage, float *pConfidence)
+int PCATrainClass::findNearestNeighbor(IplImage *inputImage, float *pConfidence)
 {
 	//double leastDistSq = 1e12;
 	double leastDistSq = DBL_MAX;
@@ -484,7 +484,7 @@ int HaarTrainRecognition::findNearestNeighbor(IplImage *inputImage, float *pConf
 
 // Re-train the new object rec database
 // Depending on the number of images in the training set and number of people, it might take 30 seconds or so.
-// bool HaarTrainRecognition::retrainOnline(void)
+// bool PCATrainClass::retrainOnline(void)
 // {
 // 	// Free & Re-initialize the global variables.
 // 	if (trainObjectNumMat)	{cvReleaseMat( &trainObjectNumMat ); trainObjectNumMat = 0;}

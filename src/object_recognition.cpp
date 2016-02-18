@@ -11,7 +11,7 @@
 //#include <term.h>
 #include <ros/package.h> //to get pkg path
 #include <sys/stat.h> 
-#include "haar_train_recognition.h"
+#include "PCA_train_class.h"
 
 using namespace std;
 
@@ -297,7 +297,7 @@ int main(int argc, char** argv)
     int iNearest;
 
     ObjectRecognition object_recognition(argc, argv);
-    HaarTrainRecognition trainModel(object_recognition.getWorkingSpacePath());
+    PCATrainClass trainModel(object_recognition.getWorkingSpacePath());
     // trainModel.writeWorkingSpace(object_recognition.getWorkingSpacePath());
     object_recognition.setFlagShowScreen(fShowScreen);
     ros::Rate r(10); // 10 hz
