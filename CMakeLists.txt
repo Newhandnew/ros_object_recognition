@@ -6,6 +6,11 @@ project(object_recognition)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
+
+# don't use opencv as found by any prior running of find_package
+unset(OpenCV_CONFIG_PATH CACHE)
+unset(OpenCV_DIR CACHE)
+
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
   roscpp
@@ -17,10 +22,17 @@ find_package(catkin REQUIRED COMPONENTS
 #CFLAGS:
 # set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -o0")
 
-## System dependencies are found with CMake's conventions
-# find_package(OpenCV REQUIRED)
+# System dependencies are found with CMake's conventions
+# set(TMP_PREFIX_PATH ${CMAKE_PREFIX_PATH})
+# set(CMAKE_PREFIX_PATH "$ENV{HOME}/special/install")
+find_package(OpenCV REQUIRED)
 
+# restore CMAKE_PREFIX_PATH and other cached variables
+# so nothing other package finds this opencv
+# set(CMAKE_PREFIX_PATH ${TMP_PREFIX_PATH})
 
+# unset(OpenCV_CONFIG_PATH CACHE)
+# unset(OpenCV_DIR CACHE)
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
 ## See http://ros.org/doc/api/catkin/html/user_guide/setup_dot_py.html
@@ -110,7 +122,7 @@ include_directories(
 # add_library(face_recognition_lib src/face_recognition_lib.cpp)
 
 ## Declare a cpp executable
-add_executable(object_recognition src/object_recognition.cpp src/PCA_train_class.cpp)
+add_executable(object_recognition src/object_recognition.cpp) #src/PCA_train_class.cpp)
 # add_executable(Fclient src/face_rec_client.cpp)
 
 ## Add cmake target dependencies of the executable/library
@@ -122,7 +134,7 @@ add_dependencies(object_recognition ${catkin_EXPORTED_TARGETS})
 # add_dependencies(Fclient ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(object_recognition ${catkin_LIBRARIES})
+target_link_libraries(object_recognition ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 # target_link_libraries(Fclient ${catkin_LIBRARIES})
 
 

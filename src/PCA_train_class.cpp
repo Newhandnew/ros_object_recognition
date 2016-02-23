@@ -1,6 +1,7 @@
-#include <cvaux.h>
-#include "PCA_train_class.h"
+
+// #include <opencv2/core.hpp>
 #include <unistd.h>
+#include "PCA_train_class.h"
 
 //#define USE_MAHALANOBIS_DISTANCE	// You might get better recognition accuracy if you enable this.
 
@@ -351,7 +352,7 @@ void PCATrainClass::storeEigenobjectImages()
 			int y = h * (i / COLUMNS);
 			CvRect ROI = cvRect(x, y, w, h);
 			cvSetImageROI(bigImg, ROI);
-			cvCopyImage(byteImg, bigImg);
+			cvCopy(byteImg, bigImg);
 			cvResetImageROI(bigImg);
 			cvReleaseImage(&byteImg);
 		}
