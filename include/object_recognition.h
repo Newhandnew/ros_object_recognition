@@ -26,9 +26,10 @@ public:
 	void showCombineImages();
 	void showDepthInRangeImage();
 	void showMaxObjectImage();
-	void saveTrainingSet(const char objectName[]);
-	IplImage getObjectImage();
-	void featureDetectSURF();
+	// void saveTrainingSet(const char objectName[]);
+	void saveObjectImages(const char objectName[]);
+	Mat getGrayImage();
+	Mat getObjectImage();
 
 protected:
 	FILE *trainFile; 
@@ -40,6 +41,7 @@ private:
 	ros::Subscriber depth_image_receiver;
 
 	Mat rgbImage;
+	Mat grayImage;
 	Mat depthImage;
 	Mat depthInRangeImage;
 	Mat dilationImage;
@@ -47,6 +49,8 @@ private:
 	Mat objectImage;
 	vector<Rect> boundRect;
 
+	const int minLimitRange;
+	const int maxLimitRange;
 	bool flagShowScreen;
 	bool flagSaveImage;
 	char maxContourIndex;
@@ -57,12 +61,12 @@ private:
 
     void rgbImageCB(const sensor_msgs::ImageConstPtr& msg);
     void depthImageCB(const sensor_msgs::ImageConstPtr& msg);
-    void limitRangeDepthImage(float minRange, float maxRange);
+    void limitRangeDepthImage(int minLimitRange, int maxLimitRange);
     void dilation();
     void objectFusionImage();
     void getObjectContour();
     void drawObjectRectangle(Mat image);
-    void saveObjectImages(Mat image, const char objectName[]);
+    // void saveObjectImages(Mat image, const char objectName[]);
 
 };
 

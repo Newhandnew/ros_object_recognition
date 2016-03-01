@@ -5,13 +5,10 @@
 #include <sensor_msgs/image_encodings.h>
 #include <ros/package.h> //to get pkg path
 #include <sys/stat.h> 
-// #include "PCA_train_class.h"
-#include "opencv2/features2d.hpp"
-#include "opencv2/xfeatures2d.hpp"
+#include "SURF_train_class.h"
 
-using namespace cv::xfeatures2d;
-
-ObjectRecognition::ObjectRecognition(int argc, char** argv) {
+ObjectRecognition::ObjectRecognition(int argc, char** argv) : 
+    minLimitRange(30), maxLimitRange(900) {
     ros::init(argc, argv, "object_recognition");
     ros::NodeHandle n;
     imageSavedCount = 0;
@@ -49,6 +46,7 @@ void ObjectRecognition::rgbImageCB(const sensor_msgs::ImageConstPtr& pRGBInput) 
     try
     {
         rgbImage = cv_bridge::toCvShare(pRGBInput, "bgr8") -> image;
+        cvtColor(rgbImage, grayImage, CV_BGR2GRAY);
     }
     catch (cv_bridge::Exception& e)
     {
@@ -104,7 +102,7 @@ void ObjectRecognition::showCombineImages() {
         targetROI = dst(Rect(rgbImage.cols, 0, depthImage.cols, depthImage.rows));
         rgbDepthImage.copyTo(targetROI);
         // image3: limit range and dilation image processing
-        limitRangeDepthImage(200, 1000);
+        limitRangeDepthImage(minLimitRange, maxLimitRange);
         dilation();
         // change gray image to rgb image and show
         cvtColor(dilationImage, rgbDepthImage, CV_GRAY2RGB);
@@ -127,12 +125,12 @@ void ObjectRecognition::showCombineImages() {
     }
 }
 
-void ObjectRecognition::limitRangeDepthImage(float minRange, float maxRange) {
+void ObjectRecognition::limitRangeDepthImage(int minLimitRange, int maxLimitRange) {
     if(depthImage.cols > 0) {
         depthInRangeImage = Mat(depthImage.rows, depthImage.cols, CV_8UC1, Scalar::all(0));
         for(int i = 0; i < depthImage.rows; i++) { 
             for(int j = 0; j < depthImage.cols; j++) {
-                if(depthImage.at<float>(i,j) > minRange && depthImage.at<float>(i,j) < maxRange) {
+                if(depthImage.at<float>(i,j) > minLimitRange && depthImage.at<float>(i,j) < maxLimitRange) {
                     depthInRangeImage.at<char>(i,j) = 255;
                 }
             }   
@@ -142,7 +140,7 @@ void ObjectRecognition::limitRangeDepthImage(float minRange, float maxRange) {
 
 void ObjectRecognition::dilation() {
     if(depthInRangeImage.cols > 0) {
-        char dilation_size = 3;        // chnage this setting if necessary
+        char dilation_size = 4;        // chnage this setting if necessary
         Mat element = getStructuringElement( MORPH_RECT, Size(2 * dilation_size + 1, 2 * dilation_size + 1), Point(dilation_size, dilation_size));
         dilate( depthInRangeImage, dilationImage, element );
     }
@@ -200,54 +198,52 @@ void ObjectRecognition::showMaxObjectImage() {
     }
 }
 
-IplImage ObjectRecognition::getObjectImage() {
-    return IplImage(objectImage);
+Mat ObjectRecognition::getGrayImage() {
+    return grayImage;
 }
 
-// equalized and save image
-void ObjectRecognition::saveObjectImages(Mat image, const char objectName[]) {
+Mat ObjectRecognition::getObjectImage() {
+    return objectImage;
+}
+
+void ObjectRecognition::saveObjectImages(const char objectName[]) {
     char saveFileName[256];
     chdir(path.c_str());
     mkdir("data",S_IRWXU | S_IRWXG | S_IRWXO); 
-    sprintf(saveFileName, "data/%d_%s%d.pgm", objectIndex, objectName, imageSavedCount++);
-    // write train.txt file
-    trainFile = fopen("train.txt", "a+");       // if not exist create it
-    fprintf(trainFile, "%d %s %s\n", objectIndex, objectName, saveFileName);
-    fclose(trainFile);
+    sprintf(saveFileName, "data/%s.pgm", objectName);
     // rgb to gray and equalization
-    Mat objectImageProcessed;
-    cvtColor(image, objectImageProcessed, CV_RGB2GRAY);
-    equalizeHist( objectImageProcessed, objectImageProcessed );     // equalization
-    imwrite(saveFileName, objectImageProcessed);
+    imwrite(saveFileName, objectImage(boundRect[maxContourIndex]));
+    printf("write image to %s\n", saveFileName);
 }
 
-void ObjectRecognition::saveTrainingSet(const char objectName[]) {
-    if(flagSaveImage == true) {
-        if(imageSavedCount < numTrainingSet) {
-            saveObjectImages(objectImage(boundRect[maxContourIndex]), objectName);
-        }
-        else {
-            flagSaveImage = false;
-            imageSavedCount = 0;
-        }
-    }
-}
+// equalized and save image
+// void ObjectRecognition::saveObjectImages(Mat image, const char objectName[]) {
+//     char saveFileName[256];
+//     chdir(path.c_str());
+//     mkdir("data",S_IRWXU | S_IRWXG | S_IRWXO); 
+//     sprintf(saveFileName, "data/%d_%s%d.pgm", objectIndex, objectName, imageSavedCount++);
+//     // write train.txt file
+//     trainFile = fopen("train.txt", "a+");       // if not exist create it
+//     fprintf(trainFile, "%d %s %s\n", objectIndex, objectName, saveFileName);
+//     fclose(trainFile);
+//     // rgb to gray and equalization
+//     Mat objectImageProcessed;
+//     cvtColor(image, objectImageProcessed, CV_RGB2GRAY);
+//     equalizeHist( objectImageProcessed, objectImageProcessed );     // equalization
+//     imwrite(saveFileName, objectImageProcessed);
+// }
 
-void ObjectRecognition::featureDetectSURF() {
-    Mat grayImage;
-    //Convert the RGB image obtained from camera into Grayscale
-    cvtColor(objectImage, grayImage, CV_BGR2GRAY);
-    //-- Step 1: Detect the keypoints using SURF Detector
-    int minHessian = 400;
-    Ptr<SURF> detector = SURF::create( minHessian );
-    std::vector<KeyPoint> keypoints_1;
-    detector->detect( grayImage, keypoints_1 );
-    //-- Draw keypoints
-    Mat img_keypoints_1;
-    drawKeypoints( rgbImage, keypoints_1, img_keypoints_1, Scalar::all(-1), DrawMatchesFlags::DEFAULT );
-    imshow("Feature image", img_keypoints_1);
-    cvWaitKey(1);
-}
+// void ObjectRecognition::saveTrainingSet(const char objectName[]) {
+//     if(flagSaveImage == true) {
+//         if(imageSavedCount < numTrainingSet) {
+//             saveObjectImages(objectImage(boundRect[maxContourIndex]), objectName);
+//         }
+//         else {
+//             flagSaveImage = false;
+//             imageSavedCount = 0;
+//         }
+//     }
+// }
 
 // ===========================================================================================
 
@@ -255,11 +251,10 @@ int main(int argc, char** argv)
 {
     bool fShowScreen = true;
     float confidence;
-    IplImage objectImage;
     int iNearest;
+    Mat featureImage;
     ObjectRecognition object_recognition(argc, argv);
-    // PCATrainClass trainModel(object_recognition.getWorkingSpacePath());
-    // trainModel.writeWorkingSpace(object_recognition.getWorkingSpacePath());
+    SURFTrainClass trainModel(object_recognition.getWorkingSpacePath());
     object_recognition.setFlagShowScreen(fShowScreen);
     ros::Rate r(10); // 10 hz
     while(ros::ok()) {
@@ -272,18 +267,20 @@ int main(int argc, char** argv)
                     object_recognition.showMaxObjectImage();
                     break;
                 case 's':   // save
-                    object_recognition.setFlagSaveImage(true);
+                    object_recognition.saveObjectImages(argv[1]);
                     break;
-                case 'l':   // learn
-                    // trainModel.learn("train.txt");
+                case 'l':   // save
+                    // trainModel.save("train.txt");
                     break;
                 case 'r':   // recognition
-                    objectImage = object_recognition.getObjectImage();
+                    trainModel.findMatches(object_recognition.getObjectImage(), argv[1]);
+                    // objectImage = object_recognition.getObjectImage();
                     // iNearest = trainModel.findNearestNeighbor(&objectImage, &confidence);
-                    printf("result is: %d and confidence: %f\n", iNearest, confidence);
+                    // printf("result is: %d and confidence: %f\n", iNearest, confidence);
                     break;
                 case 'f':
-                    object_recognition.featureDetectSURF();
+                    featureImage = trainModel.getSURFFeatureMat(object_recognition.getObjectImage());
+                    object_recognition.showImage(featureImage);
                     break;
                 case 27:    // ESC = 17
                     exit(1);
