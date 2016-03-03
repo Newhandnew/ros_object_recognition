@@ -27,7 +27,7 @@ public:
 	void showDepthInRangeImage();
 	void showMaxObjectImage();
 	// void saveTrainingSet(const char objectName[]);
-	void saveObjectImages(const char objectName[]);
+	void saveObjectImages(const char *objectName);
 	Mat getGrayImage();
 	Mat getObjectImage();
 

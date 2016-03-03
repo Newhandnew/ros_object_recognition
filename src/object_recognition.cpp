@@ -206,13 +206,19 @@ Mat ObjectRecognition::getObjectImage() {
     return objectImage;
 }
 
-void ObjectRecognition::saveObjectImages(const char objectName[]) {
+// check image exist or not, save image and pattern.txt or rewrite image only
+void ObjectRecognition::saveObjectImages(const char *objectName) {
     char saveFileName[256];
     chdir(path.c_str());
     mkdir("data",S_IRWXU | S_IRWXG | S_IRWXO); 
     sprintf(saveFileName, "data/%s.pgm", objectName);
-    // rgb to gray and equalization
-    imwrite(saveFileName, objectImage(boundRect[maxContourIndex]));
+    if( access( saveFileName, F_OK ) == -1 ) {
+        // file not exists write pattern.txt file
+        trainFile = fopen("pattern.txt", "a+");       // if not exist create it
+        fprintf(trainFile, "%s\n", saveFileName);
+        fclose(trainFile);
+    }
+    imwrite(saveFileName, objectImage(boundRect[maxContourIndex]));     // write the largest object
     printf("write image to %s\n", saveFileName);
 }
 
@@ -273,7 +279,7 @@ int main(int argc, char** argv)
                     // trainModel.save("train.txt");
                     break;
                 case 'r':   // recognition
-                    trainModel.findMatches(object_recognition.getObjectImage(), argv[1]);
+                    trainModel.findMatches(object_recognition.getObjectImage(), "pattern.txt");
                     // objectImage = object_recognition.getObjectImage();
                     // iNearest = trainModel.findNearestNeighbor(&objectImage, &confidence);
                     // printf("result is: %d and confidence: %f\n", iNearest, confidence);
