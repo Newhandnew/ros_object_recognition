@@ -11,11 +11,18 @@ using namespace cv::xfeatures2d;
 
 class SURFTrainClass {
 public:
+	struct matchData
+	{
+		char name[20];
+		int x;
+		int y;
+	};
+
 	SURFTrainClass(const char *inputWorkingSpace);
 	~SURFTrainClass();
 	bool save(const char *szFileTrain);
 	Mat getSURFFeatureMat(Mat inputImage);
-	void findMatches(Mat inputImage, const char *loadFileName);
+	std::vector<SURFTrainClass::matchData> findMatches(Mat inputImage, const char *loadFileName);
 	
 private:
 	const int minHessian;

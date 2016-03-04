@@ -5,17 +5,18 @@
 #include <sensor_msgs/image_encodings.h>
 #include <ros/package.h> //to get pkg path
 #include <sys/stat.h> 
-#include "SURF_train_class.h"
+#include "object_recognition/match_data.h"
+#include "object_recognition/match_data_array.h"
 
-ObjectRecognition::ObjectRecognition(int argc, char** argv) : 
+ObjectRecognition::ObjectRecognition(const char *name) : 
     minLimitRange(30), maxLimitRange(900) {
-    ros::init(argc, argv, "object_recognition");
-    ros::NodeHandle n;
     imageSavedCount = 0;
     // numTrainingSet(25);
     flagSaveImage = false;
     objectIndex = 1;
-    path = ros::package::getPath("object_recognition");     // get pkg path
+    ros::NodeHandle n;
+    path = ros::package::getPath(name);     // get pkg path
+    match_publisher = n.advertise<object_recognition::match_data_array>("matches", 10);
     rgb_image_receiver = n.subscribe("/camera/rgb/image_raw", 1, &ObjectRecognition::rgbImageCB, this);
     depth_image_receiver = n.subscribe("/camera/depth/image_raw", 1, &ObjectRecognition::depthImageCB, this);
     if (flagShowScreen) {
@@ -222,34 +223,19 @@ void ObjectRecognition::saveObjectImages(const char *objectName) {
     printf("write image to %s\n", saveFileName);
 }
 
-// equalized and save image
-// void ObjectRecognition::saveObjectImages(Mat image, const char objectName[]) {
-//     char saveFileName[256];
-//     chdir(path.c_str());
-//     mkdir("data",S_IRWXU | S_IRWXG | S_IRWXO); 
-//     sprintf(saveFileName, "data/%d_%s%d.pgm", objectIndex, objectName, imageSavedCount++);
-//     // write train.txt file
-//     trainFile = fopen("train.txt", "a+");       // if not exist create it
-//     fprintf(trainFile, "%d %s %s\n", objectIndex, objectName, saveFileName);
-//     fclose(trainFile);
-//     // rgb to gray and equalization
-//     Mat objectImageProcessed;
-//     cvtColor(image, objectImageProcessed, CV_RGB2GRAY);
-//     equalizeHist( objectImageProcessed, objectImageProcessed );     // equalization
-//     imwrite(saveFileName, objectImageProcessed);
-// }
-
-// void ObjectRecognition::saveTrainingSet(const char objectName[]) {
-//     if(flagSaveImage == true) {
-//         if(imageSavedCount < numTrainingSet) {
-//             saveObjectImages(objectImage(boundRect[maxContourIndex]), objectName);
-//         }
-//         else {
-//             flagSaveImage = false;
-//             imageSavedCount = 0;
-//         }
-//     }
-// }
+void ObjectRecognition::publishMatchObjects(vector<SURFTrainClass::matchData> matchedObjects) {
+    object_recognition::match_data data;
+    object_recognition::match_data_array msg;
+    int i;
+    for (i = 0; i < matchedObjects.size(); i++) {
+        string name(matchedObjects[i].name);
+        data.name = name;
+        data.x = matchedObjects[i].x;
+        data.y = matchedObjects[i].y;
+        msg.objects.push_back(data);
+    }
+    match_publisher.publish(msg);
+}
 
 // ===========================================================================================
 
@@ -257,11 +243,14 @@ int main(int argc, char** argv)
 {
     bool fShowScreen = true;
     float confidence;
-    int iNearest;
+    int i;
     Mat featureImage;
-    ObjectRecognition object_recognition(argc, argv);
+    
+    ros::init(argc, argv, "object_recognition");
+    ObjectRecognition object_recognition("object_recognition");
     SURFTrainClass trainModel(object_recognition.getWorkingSpacePath());
     object_recognition.setFlagShowScreen(fShowScreen);
+    vector<SURFTrainClass::matchData> matchedObjects;
     ros::Rate r(10); // 10 hz
     while(ros::ok()) {
         ros::spinOnce();
@@ -275,18 +264,18 @@ int main(int argc, char** argv)
                 case 's':   // save
                     object_recognition.saveObjectImages(argv[1]);
                     break;
-                case 'l':   // save
-                    // trainModel.save("train.txt");
-                    break;
                 case 'r':   // recognition
-                    trainModel.findMatches(object_recognition.getObjectImage(), "pattern.txt");
-                    // objectImage = object_recognition.getObjectImage();
-                    // iNearest = trainModel.findNearestNeighbor(&objectImage, &confidence);
-                    // printf("result is: %d and confidence: %f\n", iNearest, confidence);
+                    matchedObjects = trainModel.findMatches(object_recognition.getObjectImage(), "pattern.txt");
                     break;
-                case 'f':
+                case 'f':   //feature
                     featureImage = trainModel.getSURFFeatureMat(object_recognition.getObjectImage());
                     object_recognition.showImage(featureImage);
+                    break;
+                case 'p':   // print
+                    for (i = 0; i < matchedObjects.size(); i++) {
+                        printf("match: %s, x = %d, y = %d\n", matchedObjects[i].name, matchedObjects[i].x, matchedObjects[i].y);
+                    }
+                    object_recognition.publishMatchObjects(matchedObjects);
                     break;
                 case 27:    // ESC = 17
                     exit(1);

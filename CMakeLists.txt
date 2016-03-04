@@ -17,6 +17,7 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   cv_bridge
   image_transport
+  message_generation
 )
 
 #CFLAGS:
@@ -62,11 +63,12 @@ find_package(OpenCV REQUIRED)
 ##   * uncomment the generate_messages entry below
 ##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
 
-## Generate messages in the 'msg' folder
- # add_message_files(
- #   FILES
- #   FRClientGoal.msg
- # )
+# Generate messages in the 'msg' folder
+ add_message_files(
+   FILES
+   match_data.msg
+   match_data_array.msg
+ )
 
 ## Generate services in the 'srv' folder
 # add_service_files(
@@ -81,12 +83,11 @@ find_package(OpenCV REQUIRED)
 #    FaceRecognition.action
 # )
 
-## Generate added messages and services with any dependencies listed here
-#  generate_messages(
-#    DEPENDENCIES
-#    std_msgs
-#    actionlib_msgs
-# )
+# Generate added messages and services with any dependencies listed here
+ generate_messages(
+   DEPENDENCIES
+   std_msgs
+)
 
 ###################################
 ## catkin specific configuration ##
@@ -99,8 +100,7 @@ find_package(OpenCV REQUIRED)
 ## DEPENDS: system dependencies of this project that dependent projects also need
 
 catkin_package(
-  INCLUDE_DIRS ${actionlib_msgs_PACKAGE_PATH}
-  CATKIN_DEPENDS roscpp std_msgs roscpp cv_bridge image_transport #opencv2  
+  CATKIN_DEPENDS roscpp std_msgs roscpp cv_bridge image_transport message_runtime  
 )
 
 

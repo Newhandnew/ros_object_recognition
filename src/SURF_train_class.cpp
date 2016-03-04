@@ -35,7 +35,7 @@ Mat SURFTrainClass::getSURFFeatureMat(Mat inputImage) {
 	return outputImage;
 }
 
-void SURFTrainClass::findMatches(Mat inputImage, const char *loadFileName) {
+std::vector<SURFTrainClass::matchData> SURFTrainClass::findMatches(Mat inputImage, const char *loadFileName) {
 	//Convert the RGB image obtained from camera into Grayscale
 	Mat grayImage;
 	if(inputImage.channels() != 1 || inputImage.depth() != CV_8U)
@@ -43,6 +43,7 @@ void SURFTrainClass::findMatches(Mat inputImage, const char *loadFileName) {
 		cvtColor(inputImage, grayImage, CV_BGR2GRAY);
 	}
 	// -- Step 1: Detect the keypoints using SURF Detector
+	vector<matchData> matchedObjects;
 	char patternName[100];
 	char *trimPatternName;
 	int patternNumber = getPatternNumber(loadFileName);
@@ -53,7 +54,7 @@ void SURFTrainClass::findMatches(Mat inputImage, const char *loadFileName) {
 		trimPatternName = strtok(patternName, "\n");
 		Mat objectImage = imread( trimPatternName, IMREAD_GRAYSCALE );
 		if ( !objectImage.data || !grayImage.data )
-		{ printf(" --(!) Error reading images\n "); return; }
+		{ printf(" --(!) Error reading images\n "); return matchedObjects; }
 
 		//-- Step 1: Detect the keypoints using SURF Detector
 		Ptr<SURF> detector = SURF::create( minHessian );
@@ -79,7 +80,7 @@ void SURFTrainClass::findMatches(Mat inputImage, const char *loadFileName) {
 		if(objectDescriptors.type()==CV_8U)
 		{
 			// Binary descriptors detected (from ORB, Brief, BRISK, FREAK)
-			printf("Binary descriptors detected...\n");
+			// printf("Binary descriptors detected...\n");
 			if(useBFMatcher)
 			{
 				cv::BFMatcher matcher(cv::NORM_HAMMING); // use cv::NORM_HAMMING2 for ORB descriptor with WTA_K == 3 or 4 (see ORB constructor)
@@ -97,7 +98,7 @@ void SURFTrainClass::findMatches(Mat inputImage, const char *loadFileName) {
 		else
 		{
 			// assume it is CV_32F
-			printf("Float descriptors detected...\n");
+			// printf("Float descriptors detected...\n");
 			if(useBFMatcher)
 			{
 				cv::BFMatcher matcher(cv::NORM_L2);
@@ -123,7 +124,7 @@ void SURFTrainClass::findMatches(Mat inputImage, const char *loadFileName) {
 		}
 
 		////////////////////////////
-		// PROCESS NEAREST NEIGHBOR RESULTS
+		//-- Step3: PROCESS NEAREST NEIGHBOR RESULTS
 		////////////////////////////
 		// Find correspondences by NNDR (Nearest Neighbor Distance Ratio)
 		float nndrRatio = 0.8f;
@@ -162,11 +163,11 @@ void SURFTrainClass::findMatches(Mat inputImage, const char *loadFileName) {
 			}
 		}
 
-		// FIND HOMOGRAPHY
+		//-- Step4: FIND HOMOGRAPHY
 		unsigned int minInliers = 23;
 		if(objectMatchPoints.size() >= minInliers)
 		{
-			printf("find %s match, feature number: %d\n", trimPatternName, (int)objectMatchPoints.size());
+			printf("%s match, feature number: %d\n", trimPatternName, (int)objectMatchPoints.size());
 			// drawMatches( objectImage, objectKeypoints, inputImage, sceneKeypoints,
 			//              good_matches, img_matches, Scalar::all(-1), Scalar::all(-1),
 			//              vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
@@ -177,11 +178,18 @@ void SURFTrainClass::findMatches(Mat inputImage, const char *loadFileName) {
 				obj_corners[0] = cvPoint(0, 0); obj_corners[1] = cvPoint( objectImage.cols, 0 );
 				obj_corners[2] = cvPoint( objectImage.cols, objectImage.rows ); obj_corners[3] = cvPoint( 0, objectImage.rows );
 				std::vector<Point2f> scene_corners(4);
-
+				// reflect object corners to scene corner
 				perspectiveTransform( obj_corners, scene_corners, H);
 				if(bShowMatchImage) {
 					showMatchImage(inputImage, scene_corners);
 				}
+				int sceneObjectX = (scene_corners[0].x + scene_corners[1].x + scene_corners[2].x + scene_corners[3].x) / 4;
+				int sceneObjectY = (scene_corners[0].y + scene_corners[1].y + scene_corners[2].y + scene_corners[3].y) / 4;
+				printf("object x = %d, object y = %d\n", sceneObjectX, sceneObjectY);
+				// 
+				matchData currentObject = {"", sceneObjectX, sceneObjectY};
+				strncpy(currentObject.name, trimPatternName, sizeof(currentObject.name));	// copy string
+				matchedObjects.push_back(currentObject);
 			}
 		}
 		else
@@ -189,6 +197,7 @@ void SURFTrainClass::findMatches(Mat inputImage, const char *loadFileName) {
 			printf("Not enough matches (%d) for homography...\n", (int)objectMatchPoints.size());
 		}
 	}
+	return matchedObjects;
 }
 
 int SURFTrainClass::getPatternNumber(const char *loadFileName) {
@@ -222,7 +231,6 @@ void SURFTrainClass::showMatchImage(Mat inputImage, std::vector<Point2f> scene_c
 	// put position on image
 	int sceneObjectX = (scene_corners[0].x + scene_corners[1].x + scene_corners[2].x + scene_corners[3].x) / 4;
 	int sceneObjectY = (scene_corners[0].y + scene_corners[1].y + scene_corners[2].y + scene_corners[3].y) / 4;
-	printf("object x = %d, object y = %d\n", sceneObjectX, sceneObjectY);
 	CvPoint sceneObjectCenter((scene_corners[0].x + scene_corners[3].x) / 2, sceneObjectY);
 	char textCenter[20];
 	sprintf(textCenter, "Center = (%d, %d)", sceneObjectX, sceneObjectY);

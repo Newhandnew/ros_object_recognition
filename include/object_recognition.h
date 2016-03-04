@@ -5,6 +5,7 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
+#include "SURF_train_class.h"
 
 /*****************************************************************************
 ** Class
@@ -14,7 +15,7 @@ using namespace std;
 
 class ObjectRecognition {
 public:
-	ObjectRecognition(int argc, char** argv);
+	ObjectRecognition(const char *name);
 	~ObjectRecognition(void);
 
 	void setFlagShowScreen(bool);
@@ -30,13 +31,13 @@ public:
 	void saveObjectImages(const char *objectName);
 	Mat getGrayImage();
 	Mat getObjectImage();
+	void publishMatchObjects(vector<SURFTrainClass::matchData> matchedObjects);
 
 protected:
 	FILE *trainFile; 
 
 private:
-	ros::Publisher chatter_publisher;
-	ros::Publisher face_recognition_command;
+	ros::Publisher match_publisher;
 	ros::Subscriber rgb_image_receiver;
 	ros::Subscriber depth_image_receiver;
 
