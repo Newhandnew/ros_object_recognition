@@ -4,6 +4,7 @@
 #include "object_recognition/match_data.h"
 #include "object_recognition/match_data_array.h"
 #include "object_recognition/recognition.h"
+#include "object_recognition/save_object.h"
 
 /*****************************************************************************
 ** Class
@@ -32,9 +33,12 @@ private:
 
 	ros::Publisher match_publisher;
 	ros::ServiceServer service_recognition;
+	ros::ServiceServer service_save;
 
 	bool recognitionCB(object_recognition::recognition::Request  &req, 
     object_recognition::recognition::Response &res);
+    bool saveObjectCB(object_recognition::save_object::Request  &req, 
+    object_recognition::save_object::Response &res);
 
 };
 

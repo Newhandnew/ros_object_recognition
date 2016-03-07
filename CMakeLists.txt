@@ -74,6 +74,7 @@ find_package(OpenCV REQUIRED)
 add_service_files(
   FILES
   recognition.srv
+  save_object.srv
 )
 
 ## Generate actions in the 'action' folder

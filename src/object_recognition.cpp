@@ -4,6 +4,7 @@ ObjectRecognition::ObjectRecognition(): fShowScreen(false), trainFileName("patte
     ros::NodeHandle n;
     match_publisher = n.advertise<object_recognition::match_data_array>("matches", 10);
     service_recognition = n.advertiseService("recognition", &ObjectRecognition::recognitionCB, this);
+    service_save = n.advertiseService("save_object", &ObjectRecognition::saveObjectCB, this);
     image_processing = new ImageProcessing("object_recognition");
     image_processing->setFlagShowScreen(fShowScreen);
     trainModel = new SURFTrainClass(image_processing->getWorkingSpacePath(), fShowScreen);
@@ -27,7 +28,6 @@ bool ObjectRecognition::recognitionCB(object_recognition::recognition::Request  
     object_recognition::recognition::Response &res) {
     matchedObjects = trainModel->findMatches(image_processing->getObjectImage(), trainFileName);
     object_recognition::match_data data;
-    // object_recognition::match_data_array msg;
     int i;
     for (i = 0; i < matchedObjects.size(); i++) {
         string name(matchedObjects[i].name);
@@ -36,7 +36,12 @@ bool ObjectRecognition::recognitionCB(object_recognition::recognition::Request  
         data.y = matchedObjects[i].y;
         res.objects.push_back(data);
     }
-    // res = msg.objects;
+    return true;
+}
+
+bool ObjectRecognition::saveObjectCB(object_recognition::save_object::Request  &req, 
+    object_recognition::save_object::Response &res) {
+    image_processing->saveObjectImages(req.objectname.c_str());
     return true;
 }
 
