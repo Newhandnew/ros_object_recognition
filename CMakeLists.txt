@@ -70,12 +70,11 @@ find_package(OpenCV REQUIRED)
    match_data_array.msg
  )
 
-## Generate services in the 'srv' folder
-# add_service_files(
-#   FILES
-#   Service1.srv
-#   Service2.srv
-# )
+# Generate services in the 'srv' folder
+add_service_files(
+  FILES
+  recognition.srv
+)
 
 ## Generate actions in the 'action' folder
 #  add_action_files(
@@ -122,7 +121,7 @@ include_directories(
 # add_library(face_recognition_lib src/face_recognition_lib.cpp)
 
 ## Declare a cpp executable
-add_executable(object_recognition src/object_recognition.cpp src/SURF_train_class.cpp)
+add_executable(object_recognition src/object_recognition.cpp src/image_processing.cpp src/SURF_train_class.cpp)
 # add_executable(Fclient src/face_rec_client.cpp)
 
 ## Add cmake target dependencies of the executable/library

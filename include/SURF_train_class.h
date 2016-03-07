@@ -18,7 +18,8 @@ public:
 		int y;
 	};
 
-	SURFTrainClass(const char *inputWorkingSpace);
+	SURFTrainClass();
+	SURFTrainClass(const char *inputWorkingSpace, bool bShowImage);
 	~SURFTrainClass();
 	bool save(const char *szFileTrain);
 	Mat getSURFFeatureMat(Mat inputImage);
@@ -26,7 +27,7 @@ public:
 	
 private:
 	const int minHessian;
-	const bool bShowMatchImage;
+	bool bShowMatchImage;
 
 	void writeWorkingSpace(const char *);
 	int getPatternNumber(const char *loadFileName);

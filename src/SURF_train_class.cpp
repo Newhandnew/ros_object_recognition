@@ -6,9 +6,12 @@
 #include "opencv2/calib3d.hpp"
 
 //#define USE_MAHALANOBIS_DISTANCE	// You might get better recognition accuracy if you enable this.
+SURFTrainClass::SURFTrainClass() : minHessian(400) {
 
-SURFTrainClass::SURFTrainClass(const char *inputWorkingSpace) : minHessian(400), bShowMatchImage(true) {
+}
 
+SURFTrainClass::SURFTrainClass(const char *inputWorkingSpace, bool bShowImage) : minHessian(400) {
+	bShowMatchImage = bShowImage;
 	writeWorkingSpace(inputWorkingSpace);	// write working space
 }
 
