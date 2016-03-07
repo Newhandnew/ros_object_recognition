@@ -23,7 +23,7 @@ protected:
 
 
 private:
-	const bool fShowScreen;
+	bool fShowScreen;
     float confidence;
     Mat featureImage;
     ImageProcessing *image_processing;
