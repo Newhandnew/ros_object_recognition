@@ -1,7 +1,8 @@
 #include <object_recognition.h>
 
-ObjectRecognition::ObjectRecognition(): fShowScreen(false), trainFileName("pattern.txt") {
+ObjectRecognition::ObjectRecognition(): trainFileName("pattern.txt") {
     ros::NodeHandle n;
+    n.param<bool>("object_recognition/show_screen_flag", fShowScreen, true);
     match_publisher = n.advertise<object_recognition::match_data_array>("matches", 10);
     service_recognition = n.advertiseService("recognition", &ObjectRecognition::recognitionCB, this);
     service_save = n.advertiseService("save_object", &ObjectRecognition::saveObjectCB, this);

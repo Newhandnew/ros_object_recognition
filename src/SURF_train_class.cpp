@@ -197,7 +197,7 @@ std::vector<SURFTrainClass::matchData> SURFTrainClass::findMatches(Mat inputImag
 		}
 		else
 		{
-			printf("Not enough matches (%d) for homography...\n", (int)objectMatchPoints.size());
+			// printf("Not enough matches (%d) for homography...\n", (int)objectMatchPoints.size());
 		}
 	}
 	return matchedObjects;
