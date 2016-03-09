@@ -133,6 +133,7 @@ std::vector<SURFTrainClass::matchData> SURFTrainClass::findMatches(Mat inputImag
 		float nndrRatio = 0.8f;
 		std::vector<cv::Point2f> objectMatchPoints, sceneMatchPoints; // Used for homography
 		std::vector< DMatch > good_matches;
+		int limitAngle = 90;
 		// Check if this descriptor matches with those of the objects
 		if(!useBFMatcher)
 		{
@@ -143,9 +144,10 @@ std::vector<SURFTrainClass::matchData> SURFTrainClass::findMatches(Mat inputImag
 				if(results.at<int>(i,0) >= 0 && results.at<int>(i,1) >= 0 &&
 				   	dists.at<float>(i,0) <= nndrRatio * dists.at<float>(i,1))
 				{
-					objectMatchPoints.push_back(objectKeypoints.at(i).pt);
-
-					sceneMatchPoints.push_back(sceneKeypoints.at(results.at<int>(i,0)).pt);
+					if (matchInLimit(objectKeypoints[i], sceneKeypoints[i], limitAngle)) {
+						objectMatchPoints.push_back(objectKeypoints.at(i).pt);
+						sceneMatchPoints.push_back(sceneKeypoints.at(results.at<int>(i,0)).pt);
+					}
 				}
 			}
 		}
@@ -160,14 +162,13 @@ std::vector<SURFTrainClass::matchData> SURFTrainClass::findMatches(Mat inputImag
 				{
 					objectMatchPoints.push_back(objectKeypoints.at(matches.at(i).at(0).queryIdx).pt);
 					good_matches.push_back(matches.at(i).at(0));
-
 					sceneMatchPoints.push_back(sceneKeypoints.at(matches.at(i).at(0).trainIdx).pt);
 				}
 			}
 		}
 
 		//-- Step4: FIND HOMOGRAPHY
-		unsigned int minInliers = 23;
+		unsigned int minInliers = 20;
 		if(objectMatchPoints.size() >= minInliers)
 		{
 			printf("%s match, feature number: %d\n", trimPatternName, (int)objectMatchPoints.size());
@@ -241,5 +242,5 @@ void SURFTrainClass::showMatchImage(Mat inputImage, std::vector<Point2f> scene_c
 	//-- Show detected matches
 	imshow( "Good Matches & Object detection", img_matches );
 
-	waitKey(0);
+	// waitKey(0);
 }

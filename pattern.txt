@@ -1,2 +1,3 @@
 data/object.pgm
 data/object2.pgm
+data/box.pgm
