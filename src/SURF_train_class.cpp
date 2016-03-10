@@ -75,130 +75,132 @@ std::vector<SURFTrainClass::matchData> SURFTrainClass::findMatches(Mat inputImag
 		extractor->compute( objectImage, objectKeypoints, objectDescriptors );
 		extractor->compute( grayImage, sceneKeypoints, sceneDescriptors );
 
-		cv::Mat results;
-		cv::Mat dists;
-		std::vector<std::vector<cv::DMatch> > matches;
-		int k=2; // find the 2 nearest neighbors
-		bool useBFMatcher = false; // SET TO TRUE TO USE BRUTE FORCE MATCHER
-		if(objectDescriptors.type()==CV_8U)
-		{
-			// Binary descriptors detected (from ORB, Brief, BRISK, FREAK)
-			// printf("Binary descriptors detected...\n");
-			if(useBFMatcher)
+		if(objectDescriptors.cols > 0 && sceneDescriptors.cols > 0) {		// make sure descriptors is not empty
+			cv::Mat results;
+			cv::Mat dists;
+			std::vector<std::vector<cv::DMatch> > matches;
+			int k=2; // find the 2 nearest neighbors
+			bool useBFMatcher = false; // SET TO TRUE TO USE BRUTE FORCE MATCHER
+			if(objectDescriptors.type()==CV_8U)
 			{
-				cv::BFMatcher matcher(cv::NORM_HAMMING); // use cv::NORM_HAMMING2 for ORB descriptor with WTA_K == 3 or 4 (see ORB constructor)
-				matcher.knnMatch(objectDescriptors, sceneDescriptors, matches, k);
-			}
-			else
-			{
-				// Create Flann LSH index
-				cv::flann::Index flannIndex(sceneDescriptors, cv::flann::LshIndexParams(12, 20, 2), cvflann::FLANN_DIST_HAMMING);
-
-				// search (nearest neighbor)
-				flannIndex.knnSearch(objectDescriptors, results, dists, k, cv::flann::SearchParams() );
-			}
-		}
-		else
-		{
-			// assume it is CV_32F
-			// printf("Float descriptors detected...\n");
-			if(useBFMatcher)
-			{
-				cv::BFMatcher matcher(cv::NORM_L2);
-				matcher.knnMatch(objectDescriptors, sceneDescriptors, matches, k);
-			}
-			else
-			{
-				// Create Flann KDTree index
-				cv::flann::Index flannIndex(sceneDescriptors, cv::flann::KDTreeIndexParams(), cvflann::FLANN_DIST_EUCLIDEAN);
-
-				// search (nearest neighbor)
-				flannIndex.knnSearch(objectDescriptors, results, dists, k, cv::flann::SearchParams() );
-			}
-		}
-
-		// Conversion to CV_32F if needed
-		if(dists.type() == CV_32S)
-		{
-			cv::Mat temp;
-			dists.convertTo(temp, CV_32F);
-			dists = temp;
-			printf("change to CV_32F");
-		}
-
-		////////////////////////////
-		//-- Step3: PROCESS NEAREST NEIGHBOR RESULTS
-		////////////////////////////
-		// Find correspondences by NNDR (Nearest Neighbor Distance Ratio)
-		float nndrRatio = 0.8f;
-		std::vector<cv::Point2f> objectMatchPoints, sceneMatchPoints; // Used for homography
-		std::vector< DMatch > good_matches;
-		int limitAngle = 90;
-		// Check if this descriptor matches with those of the objects
-		if(!useBFMatcher)
-		{
-			for(int i=0; i<objectDescriptors.rows; ++i)
-			{
-				// Apply NNDR
-				//printf("q=%d dist1=%f dist2=%f\n", i, dists.at<float>(i,0), dists.at<float>(i,1));
-				if(results.at<int>(i,0) >= 0 && results.at<int>(i,1) >= 0 &&
-				   	dists.at<float>(i,0) <= nndrRatio * dists.at<float>(i,1))
+				// Binary descriptors detected (from ORB, Brief, BRISK, FREAK)
+				// printf("Binary descriptors detected...\n");
+				if(useBFMatcher)
 				{
-					if (matchInLimit(objectKeypoints[i], sceneKeypoints[i], limitAngle)) {
-						objectMatchPoints.push_back(objectKeypoints.at(i).pt);
-						sceneMatchPoints.push_back(sceneKeypoints.at(results.at<int>(i,0)).pt);
+					cv::BFMatcher matcher(cv::NORM_HAMMING); // use cv::NORM_HAMMING2 for ORB descriptor with WTA_K == 3 or 4 (see ORB constructor)
+					matcher.knnMatch(objectDescriptors, sceneDescriptors, matches, k);
+				}
+				else
+				{
+					// Create Flann LSH index
+					cv::flann::Index flannIndex(sceneDescriptors, cv::flann::LshIndexParams(12, 20, 2), cvflann::FLANN_DIST_HAMMING);
+
+					// search (nearest neighbor)
+					flannIndex.knnSearch(objectDescriptors, results, dists, k, cv::flann::SearchParams() );
+				}
+			}
+			else
+			{
+				// assume it is CV_32F
+				// printf("Float descriptors detected...\n");
+				if(useBFMatcher)
+				{
+					cv::BFMatcher matcher(cv::NORM_L2);
+					matcher.knnMatch(objectDescriptors, sceneDescriptors, matches, k);
+				}
+				else
+				{
+					// Create Flann KDTree index
+					cv::flann::Index flannIndex(sceneDescriptors, cv::flann::KDTreeIndexParams(), cvflann::FLANN_DIST_EUCLIDEAN);
+
+					// search (nearest neighbor)
+					flannIndex.knnSearch(objectDescriptors, results, dists, k, cv::flann::SearchParams() );
+				}
+			}
+
+			// Conversion to CV_32F if needed
+			if(dists.type() == CV_32S)
+			{
+				cv::Mat temp;
+				dists.convertTo(temp, CV_32F);
+				dists = temp;
+				printf("change to CV_32F");
+			}
+
+			////////////////////////////
+			//-- Step3: PROCESS NEAREST NEIGHBOR RESULTS
+			////////////////////////////
+			// Find correspondences by NNDR (Nearest Neighbor Distance Ratio)
+			float nndrRatio = 0.8f;
+			std::vector<cv::Point2f> objectMatchPoints, sceneMatchPoints; // Used for homography
+			std::vector< DMatch > good_matches;
+			int limitAngle = 90;
+			// Check if this descriptor matches with those of the objects
+			if(!useBFMatcher)
+			{
+				for(int i=0; i<objectDescriptors.rows; ++i)
+				{
+					// Apply NNDR
+					//printf("q=%d dist1=%f dist2=%f\n", i, dists.at<float>(i,0), dists.at<float>(i,1));
+					if(results.at<int>(i,0) >= 0 && results.at<int>(i,1) >= 0 &&
+					   	dists.at<float>(i,0) <= nndrRatio * dists.at<float>(i,1))
+					{
+						if (matchInLimit(objectKeypoints[i], sceneKeypoints[i], limitAngle)) {
+							objectMatchPoints.push_back(objectKeypoints.at(i).pt);
+							sceneMatchPoints.push_back(sceneKeypoints.at(results.at<int>(i,0)).pt);
+						}
 					}
 				}
 			}
-		}
-		else
-		{
-			for(unsigned int i=0; i<matches.size(); ++i)
+			else
 			{
-				// Apply NNDR
-				//printf("q=%d dist1=%f dist2=%f\n", matches.at(i).at(0).queryIdx, matches.at(i).at(0).distance, matches.at(i).at(1).distance);
-				if(matches.at(i).size() == 2 &&
-				   matches.at(i).at(0).distance <= nndrRatio * matches.at(i).at(1).distance)
+				for(unsigned int i=0; i<matches.size(); ++i)
 				{
-					objectMatchPoints.push_back(objectKeypoints.at(matches.at(i).at(0).queryIdx).pt);
-					good_matches.push_back(matches.at(i).at(0));
-					sceneMatchPoints.push_back(sceneKeypoints.at(matches.at(i).at(0).trainIdx).pt);
+					// Apply NNDR
+					//printf("q=%d dist1=%f dist2=%f\n", matches.at(i).at(0).queryIdx, matches.at(i).at(0).distance, matches.at(i).at(1).distance);
+					if(matches.at(i).size() == 2 &&
+					   matches.at(i).at(0).distance <= nndrRatio * matches.at(i).at(1).distance)
+					{
+						objectMatchPoints.push_back(objectKeypoints.at(matches.at(i).at(0).queryIdx).pt);
+						good_matches.push_back(matches.at(i).at(0));
+						sceneMatchPoints.push_back(sceneKeypoints.at(matches.at(i).at(0).trainIdx).pt);
+					}
 				}
 			}
-		}
 
-		//-- Step4: FIND HOMOGRAPHY
-		unsigned int minInliers = 20;
-		if(objectMatchPoints.size() >= minInliers)
-		{
-			printf("%s match, feature number: %d\n", trimPatternName, (int)objectMatchPoints.size());
-			// drawMatches( objectImage, objectKeypoints, inputImage, sceneKeypoints,
-			//              good_matches, img_matches, Scalar::all(-1), Scalar::all(-1),
-			//              vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
-			Mat H = findHomography( objectMatchPoints, sceneMatchPoints, RANSAC );
-			if (countNonZero(H) > 0) {
-				//-- Get the corners from the image_1 ( the object to be "detected" )
-				std::vector<Point2f> obj_corners(4);
-				obj_corners[0] = cvPoint(0, 0); obj_corners[1] = cvPoint( objectImage.cols, 0 );
-				obj_corners[2] = cvPoint( objectImage.cols, objectImage.rows ); obj_corners[3] = cvPoint( 0, objectImage.rows );
-				std::vector<Point2f> scene_corners(4);
-				// reflect object corners to scene corner
-				perspectiveTransform( obj_corners, scene_corners, H);
-				if(bShowMatchImage) {
-					showMatchImage(inputImage, scene_corners);
+			//-- Step4: FIND HOMOGRAPHY
+			unsigned int minInliers = 20;
+			if(objectMatchPoints.size() >= minInliers)
+			{
+				printf("%s match, feature number: %d\n", trimPatternName, (int)objectMatchPoints.size());
+				// drawMatches( objectImage, objectKeypoints, inputImage, sceneKeypoints,
+				//              good_matches, img_matches, Scalar::all(-1), Scalar::all(-1),
+				//              vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
+				Mat H = findHomography( objectMatchPoints, sceneMatchPoints, RANSAC );
+				if (countNonZero(H) > 0) {
+					//-- Get the corners from the image_1 ( the object to be "detected" )
+					std::vector<Point2f> obj_corners(4);
+					obj_corners[0] = cvPoint(0, 0); obj_corners[1] = cvPoint( objectImage.cols, 0 );
+					obj_corners[2] = cvPoint( objectImage.cols, objectImage.rows ); obj_corners[3] = cvPoint( 0, objectImage.rows );
+					std::vector<Point2f> scene_corners(4);
+					// reflect object corners to scene corner
+					perspectiveTransform( obj_corners, scene_corners, H);
+					if(bShowMatchImage) {
+						showMatchImage(inputImage, scene_corners);
+					}
+					int sceneObjectX = (scene_corners[0].x + scene_corners[1].x + scene_corners[2].x + scene_corners[3].x) / 4;
+					int sceneObjectY = (scene_corners[0].y + scene_corners[1].y + scene_corners[2].y + scene_corners[3].y) / 4;
+					printf("object x = %d, object y = %d\n", sceneObjectX, sceneObjectY);
+					// 
+					matchData currentObject = {"", sceneObjectX, sceneObjectY};
+					strncpy(currentObject.name, trimPatternName, sizeof(currentObject.name));	// copy string
+					matchedObjects.push_back(currentObject);
 				}
-				int sceneObjectX = (scene_corners[0].x + scene_corners[1].x + scene_corners[2].x + scene_corners[3].x) / 4;
-				int sceneObjectY = (scene_corners[0].y + scene_corners[1].y + scene_corners[2].y + scene_corners[3].y) / 4;
-				printf("object x = %d, object y = %d\n", sceneObjectX, sceneObjectY);
-				// 
-				matchData currentObject = {"", sceneObjectX, sceneObjectY};
-				strncpy(currentObject.name, trimPatternName, sizeof(currentObject.name));	// copy string
-				matchedObjects.push_back(currentObject);
 			}
-		}
-		else
-		{
-			// printf("Not enough matches (%d) for homography...\n", (int)objectMatchPoints.size());
+			else
+			{
+				// printf("Not enough matches (%d) for homography...\n", (int)objectMatchPoints.size());
+			}
 		}
 	}
 	return matchedObjects;

@@ -48,7 +48,7 @@ bool ObjectRecognition::saveObjectCB(object_recognition::save_object::Request  &
 
 void ObjectRecognition::run() {
     int i;
-    ros::Rate r(10); // 10 hz
+    ros::Rate r(20); // 10 hz
     while(ros::ok()) {
         ros::spinOnce();
         image_processing->showCombineImages();
