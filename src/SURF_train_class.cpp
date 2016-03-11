@@ -169,7 +169,8 @@ std::vector<SURFTrainClass::matchData> SURFTrainClass::findMatches(Mat inputImag
 			}
 
 			//-- Step4: FIND HOMOGRAPHY
-			unsigned int minInliers = 20;
+			// threshold evaluated by number of key points from object
+			unsigned int minInliers = (int)(objectKeypoints.size() * 0.15);
 			if(objectMatchPoints.size() >= minInliers)
 			{
 				printf("%s match, feature number: %d\n", trimPatternName, (int)objectMatchPoints.size());
